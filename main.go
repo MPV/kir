@@ -1,7 +1,6 @@
 package main
 
 import (
-	"flag"
 	"fmt"
 	"log"
 	"os"
@@ -13,16 +12,18 @@ import (
 	"k8s.io/client-go/kubernetes/scheme"
 )
 
-var (
-	filePath = flag.String("file", "pod.yaml", "path to the YAML file")
-)
-
 func main() {
+	var filePath string
 
-	flag.Parse()
+	if len(os.Args) < 2 {
+		log.Fatal("Usage: oci-images-from-k8s-yaml <file_path>")
+		return
+	}
+
+	filePath = os.Args[1]
 
 	// Read the YAML file
-	data, err := os.ReadFile(*filePath)
+	data, err := os.ReadFile(filePath)
 	if err != nil {
 		log.Fatalf("error: %v", err)
 	}
