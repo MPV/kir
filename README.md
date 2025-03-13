@@ -28,6 +28,19 @@ gcr.io/google-containers/sidecar
 kiwigrid/k8s-sidecar
 ```
 
+### Get images for all manifests in a folder:
+
+```shell
+$ go run main.go examples/* | sort -u
+busybox:1.28
+gcr.io/google-containers/busybox
+gcr.io/google-containers/sidecar
+kiwigrid/k8s-sidecar
+nginx
+perl
+registry.k8s.io/nginx-slim:0.8
+```
+
 ### Scan images from a manifest:
 
 ```shell
