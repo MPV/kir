@@ -2,7 +2,6 @@ package main
 
 import (
 	"bytes"
-	"flag"
 	"io/ioutil"
 	"log"
 	"os"
@@ -98,25 +97,20 @@ func createAsYamlFile(dir, name string, obj runtime.Object) {
 }
 
 func TestReadPodYAML(t *testing.T) {
-	// Set the flag
-	err := flag.Set("file", "pod.yaml")
-	if err != nil {
-		t.Fatalf("Error setting flag: %v", err)
-	}
-	flag.Parse()
-
 	// Redirect stdout
 	oldStdout := os.Stdout
 	r, w, _ := os.Pipe()
 	os.Stdout = w
 
+	// Pass the file path as an argument
+	os.Args = []string{"cmd", "pod.yaml"}
 	main()
 
 	w.Close()
 	os.Stdout = oldStdout
 
 	var buf bytes.Buffer
-	_, err = buf.ReadFrom(r)
+	_, err := buf.ReadFrom(r)
 	if err != nil {
 		t.Fatalf("Error reading from buffer: %v", err)
 	}
@@ -129,25 +123,20 @@ func TestReadPodYAML(t *testing.T) {
 }
 
 func TestReadDeploymentYAML(t *testing.T) {
-	// Set the flag
-	err := flag.Set("file", "deployment.yaml")
-	if err != nil {
-		t.Fatalf("Error setting flag: %v", err)
-	}
-	flag.Parse()
-
 	// Redirect stdout
 	oldStdout := os.Stdout
 	r, w, _ := os.Pipe()
 	os.Stdout = w
 
+	// Pass the file path as an argument
+	os.Args = []string{"cmd", "deployment.yaml"}
 	main()
 
 	w.Close()
 	os.Stdout = oldStdout
 
 	var buf bytes.Buffer
-	_, err = buf.ReadFrom(r)
+	_, err := buf.ReadFrom(r)
 	if err != nil {
 		t.Fatalf("Error reading from buffer: %v", err)
 	}
