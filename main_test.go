@@ -35,7 +35,7 @@ func TestReadPodYAML(t *testing.T) {
 		},
 	})
 
-	testReadYAML(t, "pod.yaml", "test-image\n")
+	testReadYAML(t, []string{"pod.yaml"}, "test-image\n")
 }
 
 func TestReadDeploymentYAML(t *testing.T) {
@@ -68,7 +68,7 @@ func TestReadDeploymentYAML(t *testing.T) {
 		},
 	})
 
-	testReadYAML(t, "deployment.yaml", "image1\nsidecar-image2\n")
+	testReadYAML(t, []string{"deployment.yaml"}, "image1\nsidecar-image2\n")
 }
 
 func TestReadYAMLFromFolder(t *testing.T) {
@@ -119,7 +119,50 @@ func TestReadYAMLFromFolder(t *testing.T) {
 		},
 	})
 
-	testReadYAML(t, dir, "image1\nsidecar-image2\ntest-image\n")
+	testReadYAML(t, []string{dir}, "image1\nsidecar-image2\ntest-image\n")
+}
+
+func TestReadYAMLFromGlob(t *testing.T) {
+	dir := setupTestDir(t)
+	defer os.RemoveAll(dir)
+
+	createAsYamlFile(dir, "pod1.yaml", &corev1.Pod{
+		TypeMeta: v1.TypeMeta{
+			APIVersion: "v1",
+			Kind:       "Pod",
+		},
+		ObjectMeta: v1.ObjectMeta{
+			Name: "test-pod1",
+		},
+		Spec: corev1.PodSpec{
+			Containers: []corev1.Container{
+				{
+					Name:  "test-container1",
+					Image: "test-image1",
+				},
+			},
+		},
+	})
+
+	createAsYamlFile(dir, "pod2.yaml", &corev1.Pod{
+		TypeMeta: v1.TypeMeta{
+			APIVersion: "v1",
+			Kind:       "Pod",
+		},
+		ObjectMeta: v1.ObjectMeta{
+			Name: "test-pod2",
+		},
+		Spec: corev1.PodSpec{
+			Containers: []corev1.Container{
+				{
+					Name:  "test-container2",
+					Image: "test-image2",
+				},
+			},
+		},
+	})
+
+	testReadYAML(t, []string{"pod1.yaml", "pod2.yaml"}, "test-image1\ntest-image2\n")
 }
 
 func TestReadYAMLFromStdin(t *testing.T) {
@@ -145,7 +188,7 @@ spec:
 		w.Close()
 	}()
 
-	testReadYAML(t, "-", "test-image\n")
+	testReadYAML(t, []string{"-"}, "test-image\n")
 
 	os.Stdin = oldStdin
 }
@@ -164,14 +207,14 @@ func setupTestDir(t *testing.T) string {
 	return dir
 }
 
-func testReadYAML(t *testing.T, filePath, expectedOutput string) {
+func testReadYAML(t *testing.T, filePaths []string, expectedOutput string) {
 	// Redirect stdout
 	oldStdout := os.Stdout
 	r, w, _ := os.Pipe()
 	os.Stdout = w
 
-	// Pass the file path as an argument
-	os.Args = []string{"cmd", filePath}
+	// Pass the file paths as arguments
+	os.Args = append([]string{"cmd"}, filePaths...)
 	main()
 
 	w.Close()
