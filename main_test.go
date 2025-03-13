@@ -2,7 +2,6 @@ package main
 
 import (
 	"bytes"
-	"io/ioutil"
 	"log"
 	"os"
 	"testing"
@@ -14,16 +13,15 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/serializer/json"
 )
 
-func TestMain(m *testing.M) {
+func TestReadPodYAML(t *testing.T) {
 	// Set up a temporary directory for test files
-	dir, err := ioutil.TempDir("", "test")
+	dir, err := os.MkdirTemp("", "test")
 	if err != nil {
-		log.Fatalf("error: %v", err)
+		t.Fatalf("error: %v", err)
 	}
 	defer os.RemoveAll(dir)
 
-	// Create test files
-
+	// Create test file
 	createAsYamlFile(dir, "pod.yaml", &corev1.Pod{
 		TypeMeta: v1.TypeMeta{
 			APIVersion: "v1",
@@ -42,6 +40,24 @@ func TestMain(m *testing.M) {
 		},
 	})
 
+	// Change working directory to the temporary directory
+	err = os.Chdir(dir)
+	if err != nil {
+		t.Fatalf("error: %v", err)
+	}
+
+	testReadYAML(t, "pod.yaml", "test-image\n")
+}
+
+func TestReadDeploymentYAML(t *testing.T) {
+	// Set up a temporary directory for test files
+	dir, err := os.MkdirTemp("", "test")
+	if err != nil {
+		t.Fatalf("error: %v", err)
+	}
+	defer os.RemoveAll(dir)
+
+	// Create test file
 	createAsYamlFile(dir, "deployment.yaml", &appsv1.Deployment{
 		TypeMeta: v1.TypeMeta{
 			APIVersion: "apps/v1",
@@ -56,7 +72,11 @@ func TestMain(m *testing.M) {
 					Containers: []corev1.Container{
 						{
 							Name:  "test-container",
-							Image: "test-image",
+							Image: "image1",
+						},
+						{
+							Name:  "test-sidecar",
+							Image: "sidecar-image2",
 						},
 					},
 				},
@@ -67,15 +87,38 @@ func TestMain(m *testing.M) {
 	// Change working directory to the temporary directory
 	err = os.Chdir(dir)
 	if err != nil {
-		log.Fatalf("error: %v", err)
+		t.Fatalf("error: %v", err)
 	}
 
-	// Run tests
-	os.Exit(m.Run())
+	testReadYAML(t, "deployment.yaml", "image1\nsidecar-image2\n")
+}
+
+func testReadYAML(t *testing.T, filePath, expectedOutput string) {
+	// Redirect stdout
+	oldStdout := os.Stdout
+	r, w, _ := os.Pipe()
+	os.Stdout = w
+
+	// Pass the file path as an argument
+	os.Args = []string{"cmd", filePath}
+	main()
+
+	w.Close()
+	os.Stdout = oldStdout
+
+	var buf bytes.Buffer
+	_, err := buf.ReadFrom(r)
+	if err != nil {
+		t.Fatalf("Error reading from buffer: %v", err)
+	}
+	output := buf.String()
+
+	if output != expectedOutput {
+		t.Errorf("expected %q, got %q", expectedOutput, output)
+	}
 }
 
 func createAsYamlFile(dir, name string, obj runtime.Object) {
-
 	scheme := runtime.NewScheme()
 	appsv1.AddToScheme(scheme)
 	serializer := json.NewSerializerWithOptions(json.DefaultMetaFactory, scheme, scheme, json.SerializerOptions{
@@ -93,57 +136,5 @@ func createAsYamlFile(dir, name string, obj runtime.Object) {
 	err = os.WriteFile(dir+"/"+name, buf.Bytes(), 0644)
 	if err != nil {
 		log.Fatalf("error: %v", err)
-	}
-}
-
-func TestReadPodYAML(t *testing.T) {
-	// Redirect stdout
-	oldStdout := os.Stdout
-	r, w, _ := os.Pipe()
-	os.Stdout = w
-
-	// Pass the file path as an argument
-	os.Args = []string{"cmd", "pod.yaml"}
-	main()
-
-	w.Close()
-	os.Stdout = oldStdout
-
-	var buf bytes.Buffer
-	_, err := buf.ReadFrom(r)
-	if err != nil {
-		t.Fatalf("Error reading from buffer: %v", err)
-	}
-	output := buf.String()
-
-	expected := "test-image\n"
-	if output != expected {
-		t.Errorf("expected %q, got %q", expected, output)
-	}
-}
-
-func TestReadDeploymentYAML(t *testing.T) {
-	// Redirect stdout
-	oldStdout := os.Stdout
-	r, w, _ := os.Pipe()
-	os.Stdout = w
-
-	// Pass the file path as an argument
-	os.Args = []string{"cmd", "deployment.yaml"}
-	main()
-
-	w.Close()
-	os.Stdout = oldStdout
-
-	var buf bytes.Buffer
-	_, err := buf.ReadFrom(r)
-	if err != nil {
-		t.Fatalf("Error reading from buffer: %v", err)
-	}
-	output := buf.String()
-
-	expected := "test-image\n"
-	if output != expected {
-		t.Errorf("expected %q, got %q", expected, output)
 	}
 }
