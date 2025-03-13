@@ -100,65 +100,15 @@ func processData(data []byte) {
 		return
 	}
 
-	// Handle different types of Kubernetes objects
-	switch gvk.Kind {
-	case "Pod":
-		pod, ok := obj.(*corev1.Pod)
-		if !ok {
-			log.Printf("error: not a Pod")
-			return
-		}
-		printContainerImages(pod.Spec.Containers)
-		printContainerImages(pod.Spec.InitContainers)
-	case "Deployment":
-		deployment, ok := obj.(*appsv1.Deployment)
-		if !ok {
-			log.Printf("error: not a Deployment")
-			return
-		}
-		printContainerImages(deployment.Spec.Template.Spec.Containers)
-		printContainerImages(deployment.Spec.Template.Spec.InitContainers)
-	case "DaemonSet":
-		daemonSet, ok := obj.(*appsv1.DaemonSet)
-		if !ok {
-			log.Printf("error: not a DaemonSet")
-			return
-		}
-		printContainerImages(daemonSet.Spec.Template.Spec.Containers)
-		printContainerImages(daemonSet.Spec.Template.Spec.InitContainers)
-	case "ReplicaSet":
-		replicaSet, ok := obj.(*appsv1.ReplicaSet)
-		if !ok {
-			log.Printf("error: not a ReplicaSet")
-			return
-		}
-		printContainerImages(replicaSet.Spec.Template.Spec.Containers)
-		printContainerImages(replicaSet.Spec.Template.Spec.InitContainers)
-	case "StatefulSet":
-		statefulSet, ok := obj.(*appsv1.StatefulSet)
-		if !ok {
-			log.Printf("error: not a StatefulSet")
-			return
-		}
-		printContainerImages(statefulSet.Spec.Template.Spec.Containers)
-		printContainerImages(statefulSet.Spec.Template.Spec.InitContainers)
-	case "Job":
-		job, ok := obj.(*batchv1.Job)
-		if !ok {
-			log.Printf("error: not a Job")
-			return
-		}
-		printContainerImages(job.Spec.Template.Spec.Containers)
-		printContainerImages(job.Spec.Template.Spec.InitContainers)
-	case "CronJob":
-		cronJob, ok := obj.(*batchv1.CronJob)
-		if !ok {
-			log.Printf("error: not a CronJob")
-			return
-		}
-		printContainerImages(cronJob.Spec.JobTemplate.Spec.Template.Spec.Containers)
-		printContainerImages(cronJob.Spec.JobTemplate.Spec.Template.Spec.InitContainers)
-	case "List":
+	// Check if the object has a PodSpec
+	if podSpec, err := getPodSpec(obj); err == nil {
+		printContainerImages(podSpec.Containers)
+		printContainerImages(podSpec.InitContainers)
+		return
+	}
+
+	// Handle List type separately
+	if gvk.Kind == "List" {
 		list, ok := obj.(*corev1.List)
 		if !ok {
 			log.Printf("error: not a List")
@@ -172,9 +122,30 @@ func processData(data []byte) {
 			}
 			processUnstructured(unstructuredObj)
 		}
-	default:
-		log.Printf("error: unsupported kind %s", gvk.Kind)
 		return
+	}
+
+	log.Printf("error: unsupported kind %s", gvk.Kind)
+}
+
+func getPodSpec(obj interface{}) (*corev1.PodSpec, error) {
+	switch resource := obj.(type) {
+	case *corev1.Pod:
+		return &resource.Spec, nil
+	case *appsv1.Deployment:
+		return &resource.Spec.Template.Spec, nil
+	case *appsv1.DaemonSet:
+		return &resource.Spec.Template.Spec, nil
+	case *appsv1.ReplicaSet:
+		return &resource.Spec.Template.Spec, nil
+	case *appsv1.StatefulSet:
+		return &resource.Spec.Template.Spec, nil
+	case *batchv1.Job:
+		return &resource.Spec.Template.Spec, nil
+	case *batchv1.CronJob:
+		return &resource.Spec.JobTemplate.Spec.Template.Spec, nil
+	default:
+		return nil, fmt.Errorf("object does not have a PodSpec")
 	}
 }
 
