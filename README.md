@@ -1,4 +1,4 @@
-# oci-images-from-k8s-yaml
+# 🥂 `kir` (Kubernetes Image Retriever)
 
 ## What
 
