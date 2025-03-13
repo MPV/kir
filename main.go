@@ -22,7 +22,7 @@ var supportedKinds = []string{"Pod", "Deployment", "DaemonSet", "ReplicaSet", "S
 
 func main() {
 	if len(os.Args) < 2 {
-		log.Fatal("Usage: oci-images-from-k8s-yaml <file_path> [<file_path_2> ...] or oci-images-from-k8s-yaml -")
+		log.Fatal("Usage: kir <file_path> [<file_path_2> ...] or kir -")
 		return
 	}
 
