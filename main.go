@@ -1,7 +1,9 @@
 package main
 
 import (
+	"bufio"
 	"fmt"
+	"io"
 	"log"
 	"os"
 	"path/filepath"
@@ -15,43 +17,63 @@ import (
 
 func main() {
 	if len(os.Args) < 2 {
-		log.Fatal("Usage: oci-images-from-k8s-yaml <file_path> [<file_path_2> ...]")
+		log.Fatal("Usage: oci-images-from-k8s-yaml <file_path> [<file_path_2> ...] or oci-images-from-k8s-yaml -")
 		return
 	}
 
 	for i := 1; i < len(os.Args); i++ {
 		filePath := os.Args[i]
 
-		fileInfo, err := os.Stat(filePath)
-		if err != nil {
-			log.Fatalf("error: %v", err)
-		}
-
-		if fileInfo.IsDir() {
-			err := filepath.Walk(filePath, func(path string, info os.FileInfo, err error) error {
-				if err != nil {
-					return err
-				}
-				if !info.IsDir() {
-					processFile(path)
-				}
-				return nil
-			})
-			if err != nil {
-				log.Fatalf("error: %v", err)
-			}
+		if filePath == "-" {
+			processStdin()
 		} else {
-			// Handle glob patterns
-			files, err := filepath.Glob(filePath)
+			fileInfo, err := os.Stat(filePath)
 			if err != nil {
 				log.Fatalf("error: %v", err)
 			}
 
-			for _, file := range files {
-				processFile(file)
+			if fileInfo.IsDir() {
+				err := filepath.Walk(filePath, func(path string, info os.FileInfo, err error) error {
+					if err != nil {
+						return err
+					}
+					if !info.IsDir() {
+						processFile(path)
+					}
+					return nil
+				})
+				if err != nil {
+					log.Fatalf("error: %v", err)
+				}
+			} else {
+				// Handle glob patterns
+				files, err := filepath.Glob(filePath)
+				if err != nil {
+					log.Fatalf("error: %v", err)
+				}
+
+				for _, file := range files {
+					processFile(file)
+				}
 			}
 		}
 	}
+}
+
+func processStdin() {
+	reader := bufio.NewReader(os.Stdin)
+	var data []byte
+	for {
+		line, err := reader.ReadBytes('\n')
+		if err != nil && err != io.EOF {
+			log.Fatalf("error reading stdin: %v", err)
+		}
+		data = append(data, line...)
+		if err == io.EOF {
+			break
+		}
+	}
+	processData(data)
 }
 
 func processFile(filePath string) {
@@ -61,12 +83,15 @@ func processFile(filePath string) {
 		log.Printf("error reading file %s: %v", filePath, err)
 		return
 	}
+	processData(data)
+}
 
+func processData(data []byte) {
 	// Decode the YAML file into a Kubernetes object
 	decode := serializer.NewCodecFactory(scheme.Scheme).UniversalDeserializer().Decode
 	obj, gvk, err := decode(data, nil, nil)
 	if err != nil {
-		log.Printf("error decoding file %s: %v", filePath, err)
+		log.Printf("error decoding data: %v", err)
 		return
 	}
 
@@ -75,7 +100,7 @@ func processFile(filePath string) {
 	case "Pod":
 		pod, ok := obj.(*corev1.Pod)
 		if !ok {
-			log.Printf("error: not a Pod in file %s", filePath)
+			log.Printf("error: not a Pod")
 			return
 		}
 		printContainerImages(pod.Spec.Containers)
@@ -83,7 +108,7 @@ func processFile(filePath string) {
 	case "Deployment":
 		deployment, ok := obj.(*appsv1.Deployment)
 		if !ok {
-			log.Printf("error: not a Deployment in file %s", filePath)
+			log.Printf("error: not a Deployment")
 			return
 		}
 		printContainerImages(deployment.Spec.Template.Spec.Containers)
@@ -91,7 +116,7 @@ func processFile(filePath string) {
 	case "DaemonSet":
 		daemonSet, ok := obj.(*appsv1.DaemonSet)
 		if !ok {
-			log.Printf("error: not a DaemonSet in file %s", filePath)
+			log.Printf("error: not a DaemonSet")
 			return
 		}
 		printContainerImages(daemonSet.Spec.Template.Spec.Containers)
@@ -99,7 +124,7 @@ func processFile(filePath string) {
 	case "ReplicaSet":
 		replicaSet, ok := obj.(*appsv1.ReplicaSet)
 		if !ok {
-			log.Printf("error: not a ReplicaSet in file %s", filePath)
+			log.Printf("error: not a ReplicaSet")
 			return
 		}
 		printContainerImages(replicaSet.Spec.Template.Spec.Containers)
@@ -107,7 +132,7 @@ func processFile(filePath string) {
 	case "StatefulSet":
 		statefulSet, ok := obj.(*appsv1.StatefulSet)
 		if !ok {
-			log.Printf("error: not a StatefulSet in file %s", filePath)
+			log.Printf("error: not a StatefulSet")
 			return
 		}
 		printContainerImages(statefulSet.Spec.Template.Spec.Containers)
@@ -115,7 +140,7 @@ func processFile(filePath string) {
 	case "Job":
 		job, ok := obj.(*batchv1.Job)
 		if !ok {
-			log.Printf("error: not a Job in file %s", filePath)
+			log.Printf("error: not a Job")
 			return
 		}
 		printContainerImages(job.Spec.Template.Spec.Containers)
@@ -123,13 +148,13 @@ func processFile(filePath string) {
 	case "CronJob":
 		cronJob, ok := obj.(*batchv1.CronJob)
 		if !ok {
-			log.Printf("error: not a CronJob in file %s", filePath)
+			log.Printf("error: not a CronJob")
 			return
 		}
 		printContainerImages(cronJob.Spec.JobTemplate.Spec.Template.Spec.Containers)
 		printContainerImages(cronJob.Spec.JobTemplate.Spec.Template.Spec.InitContainers)
 	default:
-		log.Printf("error: unsupported kind %s in file %s", gvk.Kind, filePath)
+		log.Printf("error: unsupported kind %s", gvk.Kind)
 		return
 	}
 }
