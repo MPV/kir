@@ -8,12 +8,17 @@ import (
 	"os"
 	"path/filepath"
 
+	"slices"
+
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/client-go/kubernetes/scheme"
 )
+
+var supportedKinds = []string{"Pod", "Deployment", "DaemonSet", "ReplicaSet", "StatefulSet", "Job", "CronJob"}
 
 func main() {
 	if len(os.Args) < 2 {
@@ -153,6 +158,20 @@ func processData(data []byte) {
 		}
 		printContainerImages(cronJob.Spec.JobTemplate.Spec.Template.Spec.Containers)
 		printContainerImages(cronJob.Spec.JobTemplate.Spec.Template.Spec.InitContainers)
+	case "List":
+		list, ok := obj.(*corev1.List)
+		if !ok {
+			log.Printf("error: not a List")
+			return
+		}
+		for _, item := range list.Items {
+			var unstructuredObj unstructured.Unstructured
+			if err := unstructuredObj.UnmarshalJSON(item.Raw); err != nil {
+				log.Printf("error unmarshaling item: %v", err)
+				continue
+			}
+			processUnstructured(unstructuredObj)
+		}
 	default:
 		log.Printf("error: unsupported kind %s", gvk.Kind)
 		return
@@ -164,4 +183,18 @@ func printContainerImages(containers []corev1.Container) {
 	for _, container := range containers {
 		fmt.Println(container.Image)
 	}
+}
+
+func processUnstructured(item unstructured.Unstructured) {
+	itemData, err := item.MarshalJSON()
+	if err != nil {
+		log.Printf("error marshaling item: %v", err)
+		return
+	}
+	gvk := item.GroupVersionKind()
+	if slices.Contains(supportedKinds, gvk.Kind) {
+		processData(itemData)
+		return
+	}
+	log.Printf("error: unsupported kind %s in List", gvk.Kind)
 }
