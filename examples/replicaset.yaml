@@ -1,0 +1,31 @@
+# Expected result:
+# ----------------
+# nginx
+# gcr.io/google-containers/sidecar
+# kiwigrid/k8s-sidecar
+apiVersion: apps/v1
+kind: ReplicaSet
+metadata:
+  name: myreplicaset
+  labels:
+    app: myapp
+    key: value
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      key: value
+  template:
+    metadata:
+      labels:
+        key: value
+    spec:
+      containers:
+        - name: myapp
+          image: nginx
+        - name: mysidecar
+          image: gcr.io/google-containers/sidecar
+      initContainers:
+        - name: init-mysidecar
+          image: kiwigrid/k8s-sidecar
+          restartPolicy: Always

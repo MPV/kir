@@ -1,0 +1,27 @@
+# Expected result:
+# ----------------
+# gcr.io/google-containers/busybox
+# gcr.io/google-containers/sidecar
+# kiwigrid/k8s-sidecar
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: my-deployment
+spec:
+  selector:
+    matchLabels:
+      app: my
+  template:
+    metadata:
+      labels:
+        app: my
+    spec:
+      containers:
+        - name: my
+          image: gcr.io/google-containers/busybox
+        - name: my-sidecar
+          image: gcr.io/google-containers/sidecar
+      initContainers:
+        - name: init
+          image: kiwigrid/k8s-sidecar
+          restartPolicy: Always
