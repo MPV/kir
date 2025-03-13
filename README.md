@@ -46,6 +46,9 @@ registry.k8s.io/nginx-slim:0.8
 ```shell
 $ kubectl -n kube-system get pod kube-proxy-mzp9j -o yaml | go run main.go -
 registry.k8s.io/kube-proxy:v1.31.7
+
+$ kubectl get pod -A -o yaml | go run main.go - | sort -u
+# [...]
 ```
 
 ### Scan images from a manifest:
