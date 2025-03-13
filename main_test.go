@@ -14,14 +14,9 @@ import (
 )
 
 func TestReadPodYAML(t *testing.T) {
-	// Set up a temporary directory for test files
-	dir, err := os.MkdirTemp("", "test")
-	if err != nil {
-		t.Fatalf("error: %v", err)
-	}
+	dir := setupTestDir(t)
 	defer os.RemoveAll(dir)
 
-	// Create test file
 	createAsYamlFile(dir, "pod.yaml", &corev1.Pod{
 		TypeMeta: v1.TypeMeta{
 			APIVersion: "v1",
@@ -40,24 +35,13 @@ func TestReadPodYAML(t *testing.T) {
 		},
 	})
 
-	// Change working directory to the temporary directory
-	err = os.Chdir(dir)
-	if err != nil {
-		t.Fatalf("error: %v", err)
-	}
-
 	testReadYAML(t, "pod.yaml", "test-image\n")
 }
 
 func TestReadDeploymentYAML(t *testing.T) {
-	// Set up a temporary directory for test files
-	dir, err := os.MkdirTemp("", "test")
-	if err != nil {
-		t.Fatalf("error: %v", err)
-	}
+	dir := setupTestDir(t)
 	defer os.RemoveAll(dir)
 
-	// Create test file
 	createAsYamlFile(dir, "deployment.yaml", &appsv1.Deployment{
 		TypeMeta: v1.TypeMeta{
 			APIVersion: "apps/v1",
@@ -84,13 +68,21 @@ func TestReadDeploymentYAML(t *testing.T) {
 		},
 	})
 
-	// Change working directory to the temporary directory
+	testReadYAML(t, "deployment.yaml", "image1\nsidecar-image2\n")
+}
+
+func setupTestDir(t *testing.T) string {
+	dir, err := os.MkdirTemp("", "test")
+	if err != nil {
+		t.Fatalf("error: %v", err)
+	}
+
 	err = os.Chdir(dir)
 	if err != nil {
 		t.Fatalf("error: %v", err)
 	}
 
-	testReadYAML(t, "deployment.yaml", "image1\nsidecar-image2\n")
+	return dir
 }
 
 func testReadYAML(t *testing.T, filePath, expectedOutput string) {
