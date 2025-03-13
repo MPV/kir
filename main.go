@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"path/filepath"
 
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
@@ -13,26 +14,40 @@ import (
 )
 
 func main() {
-	var filePath string
-
 	if len(os.Args) < 2 {
-		log.Fatal("Usage: oci-images-from-k8s-yaml <file_path>")
+		log.Fatal("Usage: oci-images-from-k8s-yaml <file_path> [<file_path_2> ...]")
 		return
 	}
 
-	filePath = os.Args[1]
+	for i := 1; i < len(os.Args); i++ {
+		filePath := os.Args[i]
 
+		// Handle glob patterns
+		files, err := filepath.Glob(filePath)
+		if err != nil {
+			log.Fatalf("error: %v", err)
+		}
+
+		for _, file := range files {
+			processFile(file)
+		}
+	}
+}
+
+func processFile(filePath string) {
 	// Read the YAML file
 	data, err := os.ReadFile(filePath)
 	if err != nil {
-		log.Fatalf("error: %v", err)
+		log.Printf("error reading file %s: %v", filePath, err)
+		return
 	}
 
 	// Decode the YAML file into a Kubernetes object
 	decode := serializer.NewCodecFactory(scheme.Scheme).UniversalDeserializer().Decode
 	obj, gvk, err := decode(data, nil, nil)
 	if err != nil {
-		log.Fatalf("error: %v", err)
+		log.Printf("error decoding file %s: %v", filePath, err)
+		return
 	}
 
 	// Handle different types of Kubernetes objects
@@ -40,54 +55,62 @@ func main() {
 	case "Pod":
 		pod, ok := obj.(*corev1.Pod)
 		if !ok {
-			log.Fatalf("error: not a Pod")
+			log.Printf("error: not a Pod in file %s", filePath)
+			return
 		}
 		printContainerImages(pod.Spec.Containers)
 		printContainerImages(pod.Spec.InitContainers)
 	case "Deployment":
 		deployment, ok := obj.(*appsv1.Deployment)
 		if !ok {
-			log.Fatalf("error: not a Deployment")
+			log.Printf("error: not a Deployment in file %s", filePath)
+			return
 		}
 		printContainerImages(deployment.Spec.Template.Spec.Containers)
 		printContainerImages(deployment.Spec.Template.Spec.InitContainers)
 	case "DaemonSet":
 		daemonSet, ok := obj.(*appsv1.DaemonSet)
 		if !ok {
-			log.Fatalf("error: not a DaemonSet")
+			log.Printf("error: not a DaemonSet in file %s", filePath)
+			return
 		}
 		printContainerImages(daemonSet.Spec.Template.Spec.Containers)
 		printContainerImages(daemonSet.Spec.Template.Spec.InitContainers)
 	case "ReplicaSet":
 		replicaSet, ok := obj.(*appsv1.ReplicaSet)
 		if !ok {
-			log.Fatalf("error: not a ReplicaSet")
+			log.Printf("error: not a ReplicaSet in file %s", filePath)
+			return
 		}
 		printContainerImages(replicaSet.Spec.Template.Spec.Containers)
 		printContainerImages(replicaSet.Spec.Template.Spec.InitContainers)
 	case "StatefulSet":
 		statefulSet, ok := obj.(*appsv1.StatefulSet)
 		if !ok {
-			log.Fatalf("error: not a StatefulSet")
+			log.Printf("error: not a StatefulSet in file %s", filePath)
+			return
 		}
 		printContainerImages(statefulSet.Spec.Template.Spec.Containers)
 		printContainerImages(statefulSet.Spec.Template.Spec.InitContainers)
 	case "Job":
 		job, ok := obj.(*batchv1.Job)
 		if !ok {
-			log.Fatalf("error: not a Job")
+			log.Printf("error: not a Job in file %s", filePath)
+			return
 		}
 		printContainerImages(job.Spec.Template.Spec.Containers)
 		printContainerImages(job.Spec.Template.Spec.InitContainers)
 	case "CronJob":
 		cronJob, ok := obj.(*batchv1.CronJob)
 		if !ok {
-			log.Fatalf("error: not a CronJob")
+			log.Printf("error: not a CronJob in file %s", filePath)
+			return
 		}
 		printContainerImages(cronJob.Spec.JobTemplate.Spec.Template.Spec.Containers)
 		printContainerImages(cronJob.Spec.JobTemplate.Spec.Template.Spec.InitContainers)
 	default:
-		log.Fatalf("error: unsupported kind %s", gvk.Kind)
+		log.Printf("error: unsupported kind %s in file %s", gvk.Kind, filePath)
+		return
 	}
 }
 
