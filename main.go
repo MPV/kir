@@ -22,14 +22,34 @@ func main() {
 	for i := 1; i < len(os.Args); i++ {
 		filePath := os.Args[i]
 
-		// Handle glob patterns
-		files, err := filepath.Glob(filePath)
+		fileInfo, err := os.Stat(filePath)
 		if err != nil {
 			log.Fatalf("error: %v", err)
 		}
 
-		for _, file := range files {
-			processFile(file)
+		if fileInfo.IsDir() {
+			err := filepath.Walk(filePath, func(path string, info os.FileInfo, err error) error {
+				if err != nil {
+					return err
+				}
+				if !info.IsDir() {
+					processFile(path)
+				}
+				return nil
+			})
+			if err != nil {
+				log.Fatalf("error: %v", err)
+			}
+		} else {
+			// Handle glob patterns
+			files, err := filepath.Glob(filePath)
+			if err != nil {
+				log.Fatalf("error: %v", err)
+			}
+
+			for _, file := range files {
+				processFile(file)
+			}
 		}
 	}
 }
