@@ -71,6 +71,85 @@ func TestReadDeploymentYAML(t *testing.T) {
 	testReadYAML(t, "deployment.yaml", "image1\nsidecar-image2\n")
 }
 
+func TestReadYAMLFromFolder(t *testing.T) {
+	dir := setupTestDir(t)
+	defer os.RemoveAll(dir)
+
+	createAsYamlFile(dir, "pod.yaml", &corev1.Pod{
+		TypeMeta: v1.TypeMeta{
+			APIVersion: "v1",
+			Kind:       "Pod",
+		},
+		ObjectMeta: v1.ObjectMeta{
+			Name: "test-pod",
+		},
+		Spec: corev1.PodSpec{
+			Containers: []corev1.Container{
+				{
+					Name:  "test-container",
+					Image: "test-image",
+				},
+			},
+		},
+	})
+
+	createAsYamlFile(dir, "deployment.yaml", &appsv1.Deployment{
+		TypeMeta: v1.TypeMeta{
+			APIVersion: "apps/v1",
+			Kind:       "Deployment",
+		},
+		ObjectMeta: v1.ObjectMeta{
+			Name: "test-deployment",
+		},
+		Spec: appsv1.DeploymentSpec{
+			Template: corev1.PodTemplateSpec{
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
+						{
+							Name:  "test-container",
+							Image: "image1",
+						},
+						{
+							Name:  "test-sidecar",
+							Image: "sidecar-image2",
+						},
+					},
+				},
+			},
+		},
+	})
+
+	testReadYAML(t, dir, "image1\nsidecar-image2\ntest-image\n")
+}
+
+func TestReadYAMLFromStdin(t *testing.T) {
+	dir := setupTestDir(t)
+	defer os.RemoveAll(dir)
+
+	yamlData := `
+apiVersion: v1
+kind: Pod
+metadata:
+  name: test-pod
+spec:
+  containers:
+  - name: test-container
+    image: test-image
+`
+	oldStdin := os.Stdin
+	r, w, _ := os.Pipe()
+	os.Stdin = r
+
+	go func() {
+		w.Write([]byte(yamlData))
+		w.Close()
+	}()
+
+	testReadYAML(t, "-", "test-image\n")
+
+	os.Stdin = oldStdin
+}
+
 func setupTestDir(t *testing.T) string {
 	dir, err := os.MkdirTemp("", "test")
 	if err != nil {
