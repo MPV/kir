@@ -22,7 +22,7 @@
 ### Get images for a manifest:
 
 ```shell
-$ go run main.go -file examples/statefulset.yaml
+$ go run main.go examples/statefulset.yaml
 registry.k8s.io/nginx-slim:0.8
 gcr.io/google-containers/sidecar
 kiwigrid/k8s-sidecar
@@ -32,11 +32,11 @@ kiwigrid/k8s-sidecar
 
 ```shell
 # Syft:
-$ go run main.go -file examples/job.yaml | xargs syft
+$ go run main.go examples/job.yaml | xargs syft
 
 # Snyk:
-$ go run main.go -file examples/job.yaml | xargs snyk container test
+$ go run main.go examples/job.yaml | xargs snyk container test
 
 # Docker Scout
-$ go run main.go -file examples/job.yaml | xargs docker scout cves
+$ go run main.go examples/job.yaml | xargs docker scout cves
 ```
