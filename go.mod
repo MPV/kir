@@ -1,4 +1,4 @@
-module github.com/mpv/oci-images-from-k8s-yaml
+module github.com/mpv/kir
 
 go 1.24.1
 
