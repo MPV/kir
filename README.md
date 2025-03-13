@@ -41,6 +41,13 @@ perl
 registry.k8s.io/nginx-slim:0.8
 ```
 
+### Get images from a running cluster:
+
+```shell
+$ kubectl -n kube-system get pod kube-proxy-mzp9j -o yaml | go run main.go -
+registry.k8s.io/kube-proxy:v1.31.7
+```
+
 ### Scan images from a manifest:
 
 ```shell
