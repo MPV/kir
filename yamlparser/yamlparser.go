@@ -2,7 +2,6 @@ package yamlparser
 
 import (
 	"fmt"
-	"log"
 	"slices"
 
 	"github.com/mpv/kir/k8s"
@@ -39,8 +38,7 @@ func ProcessData(data []byte) ([]string, error) {
 		for _, item := range list.Items {
 			var unstructuredObj unstructured.Unstructured
 			if err := unstructuredObj.UnmarshalJSON(item.Raw); err != nil {
-				log.Printf("error unmarshaling item: %v", err)
-				continue
+				return nil, fmt.Errorf("error unmarshaling item: %v", err)
 			}
 			imgs, err := processUnstructured(unstructuredObj)
 			if err != nil {
