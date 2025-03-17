@@ -14,7 +14,7 @@ func Execute(args []string) {
 		if err != nil {
 			log.Fatalf("error: %v", err)
 		}
-		logImages(images)
+		printImages(images)
 		return
 	}
 	files, err := fileutil.FindFiles(args)
@@ -26,11 +26,11 @@ func Execute(args []string) {
 		if err != nil {
 			log.Printf("error: %v", err)
 		}
-		logImages(images)
+		printImages(images)
 	}
 }
 
-func logImages(images []string) {
+func printImages(images []string) {
 	for _, image := range images {
 		fmt.Println(image)
 	}
