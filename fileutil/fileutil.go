@@ -9,16 +9,20 @@ import (
 func FindFiles(args []string) []string {
 	var files []string
 	for _, filePath := range args {
-		if filePath == "-" {
-			files = append(files, filePath)
-		} else {
-			fileInfo, err := os.Stat(filePath)
+		// Handle glob patterns
+		matchedFiles, err := filepath.Glob(filePath)
+		if err != nil {
+			log.Fatalf("error: %v", err)
+		}
+
+		for _, matchedFile := range matchedFiles {
+			fileInfo, err := os.Stat(matchedFile)
 			if err != nil {
 				log.Fatalf("error: %v", err)
 			}
 
 			if fileInfo.IsDir() {
-				err := filepath.Walk(filePath, func(path string, info os.FileInfo, err error) error {
+				err := filepath.Walk(matchedFile, func(path string, info os.FileInfo, err error) error {
 					if err != nil {
 						return err
 					}
@@ -31,12 +35,7 @@ func FindFiles(args []string) []string {
 					log.Fatalf("error: %v", err)
 				}
 			} else {
-				// Handle glob patterns
-				matchedFiles, err := filepath.Glob(filePath)
-				if err != nil {
-					log.Fatalf("error: %v", err)
-				}
-				files = append(files, matchedFiles...)
+				files = append(files, matchedFile)
 			}
 		}
 	}
