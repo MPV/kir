@@ -1,24 +1,23 @@
 package fileutil
 
 import (
-	"log"
 	"os"
 	"path/filepath"
 )
 
-func FindFiles(args []string) []string {
+func FindFiles(args []string) ([]string, error) {
 	var files []string
 	for _, filePath := range args {
 		// Handle glob patterns
 		matchedFiles, err := filepath.Glob(filePath)
 		if err != nil {
-			log.Fatalf("error: %v", err)
+			return nil, err
 		}
 
 		for _, matchedFile := range matchedFiles {
 			fileInfo, err := os.Stat(matchedFile)
 			if err != nil {
-				log.Fatalf("error: %v", err)
+				return nil, err
 			}
 
 			if fileInfo.IsDir() {
@@ -32,12 +31,12 @@ func FindFiles(args []string) []string {
 					return nil
 				})
 				if err != nil {
-					log.Fatalf("error: %v", err)
+					return nil, err
 				}
 			} else {
 				files = append(files, matchedFile)
 			}
 		}
 	}
-	return files
+	return files, nil
 }

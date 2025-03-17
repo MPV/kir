@@ -45,7 +45,10 @@ func TestFindFiles(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := FindFiles(tt.args)
+			got, err := FindFiles(tt.args)
+			if err != nil {
+				t.Fatalf("FindFiles() error = %v", err)
+			}
 			if len(got) != len(tt.want) {
 				t.Errorf("FindFiles() = %v, want %v", got, tt.want)
 			}

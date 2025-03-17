@@ -17,7 +17,10 @@ func Execute(args []string) {
 		logImages(images)
 		return
 	}
-	files := fileutil.FindFiles(args)
+	files, err := fileutil.FindFiles(args)
+	if err != nil {
+		log.Fatalf("error: %v", err)
+	}
 	for _, filePath := range files {
 		images, err := processor.ProcessFile(filePath)
 		if err != nil {
