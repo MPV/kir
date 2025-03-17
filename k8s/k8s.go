@@ -37,3 +37,15 @@ func GetContainerImages(containers []corev1.Container) []string {
 	}
 	return images
 }
+
+func GetContainersFromObject(obj interface{}) ([]corev1.Container, error) {
+	podSpec, err := GetPodSpec(obj)
+	if err != nil {
+		return nil, err
+	}
+
+	var containers []corev1.Container
+	containers = append(containers, podSpec.Containers...)
+	containers = append(containers, podSpec.InitContainers...)
+	return containers, nil
+}

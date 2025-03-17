@@ -157,3 +157,97 @@ func TestGetPodSpecInvalid(t *testing.T) {
 		t.Fatal("GetPodSpec() expected error, got nil")
 	}
 }
+
+func TestGetContainerImages(t *testing.T) {
+	containers := []corev1.Container{
+		{Name: "container1", Image: "image1"},
+		{Name: "container2", Image: "image2"},
+	}
+
+	expected := []string{"image1", "image2"}
+	images := GetContainerImages(containers)
+
+	if len(images) != len(expected) {
+		t.Fatalf("expected %d images, got %d", len(expected), len(images))
+	}
+
+	for i, img := range images {
+		if img != expected[i] {
+			t.Errorf("expected image %q, got %q", expected[i], img)
+		}
+	}
+}
+
+func TestGetContainersFromObject(t *testing.T) {
+	tests := []struct {
+		name    string
+		obj     interface{}
+		want    []corev1.Container
+		wantErr bool
+	}{
+		{
+			name: "Pod",
+			obj: &corev1.Pod{
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
+						{Name: "container1", Image: "image1"},
+					},
+					InitContainers: []corev1.Container{
+						{Name: "init-container1", Image: "init-image1"},
+					},
+				},
+			},
+			want: []corev1.Container{
+				{Name: "container1", Image: "image1"},
+				{Name: "init-container1", Image: "init-image1"},
+			},
+			wantErr: false,
+		},
+		{
+			name: "Deployment",
+			obj: &appsv1.Deployment{
+				Spec: appsv1.DeploymentSpec{
+					Template: corev1.PodTemplateSpec{
+						Spec: corev1.PodSpec{
+							Containers: []corev1.Container{
+								{Name: "container1", Image: "image1"},
+							},
+							InitContainers: []corev1.Container{
+								{Name: "init-container1", Image: "init-image1"},
+							},
+						},
+					},
+				},
+			},
+			want: []corev1.Container{
+				{Name: "container1", Image: "image1"},
+				{Name: "init-container1", Image: "init-image1"},
+			},
+			wantErr: false,
+		},
+		{
+			name:    "Invalid",
+			obj:     "invalid",
+			want:    nil,
+			wantErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := GetContainersFromObject(tt.obj)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("GetContainersFromObject() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if len(got) != len(tt.want) {
+				t.Errorf("expected %d containers, got %d", len(tt.want), len(got))
+			}
+			for i, container := range got {
+				if container.Name != tt.want[i].Name || container.Image != tt.want[i].Image {
+					t.Errorf("expected container %v, got %v", tt.want[i], container)
+				}
+			}
+		})
+	}
+}

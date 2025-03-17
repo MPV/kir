@@ -24,10 +24,9 @@ func ProcessData(data []byte) ([]string, error) {
 
 	var images []string
 
-	// Check if the object has a PodSpec
-	if podSpec, err := k8s.GetPodSpec(obj); err == nil {
-		images = append(images, k8s.GetContainerImages(podSpec.Containers)...)
-		images = append(images, k8s.GetContainerImages(podSpec.InitContainers)...)
+	// Check if the object has containers
+	if containers, err := k8s.GetContainersFromObject(obj); err == nil {
+		images = append(images, k8s.GetContainerImages(containers)...)
 		return images, nil
 	}
 
