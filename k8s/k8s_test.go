@@ -151,11 +151,6 @@ func TestGetPodSpecInvalid(t *testing.T) {
 	if err == nil || err.Error() != "object does not have a PodSpec" {
 		t.Fatalf("GetPodSpec() error = %v, want %q", err, "object does not have a PodSpec")
 	}
-
-	// ...
-	if err == nil {
-		t.Fatal("GetPodSpec() expected error, got nil")
-	}
 }
 
 func TestGetContainerImages(t *testing.T) {
