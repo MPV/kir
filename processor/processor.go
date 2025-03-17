@@ -2,8 +2,8 @@ package processor
 
 import (
 	"bufio"
+	"fmt"
 	"io"
-	"log"
 	"os"
 
 	"github.com/mpv/kir/yamlparser"
@@ -15,7 +15,7 @@ func ProcessStdin() ([]string, error) {
 	for {
 		line, err := reader.ReadBytes('\n')
 		if err != nil && err != io.EOF {
-			log.Fatalf("error reading stdin: %v", err)
+			return nil, fmt.Errorf("error reading stdin: %v", err)
 		}
 		data = append(data, line...)
 		if err == io.EOF {
@@ -28,8 +28,7 @@ func ProcessStdin() ([]string, error) {
 func ProcessFile(filePath string) ([]string, error) {
 	data, err := os.ReadFile(filePath)
 	if err != nil {
-		log.Printf("error reading file %s: %v", filePath, err)
-		return nil, err
+		return nil, fmt.Errorf("error reading file: %v", err)
 	}
 	return yamlparser.ProcessData(data)
 }
