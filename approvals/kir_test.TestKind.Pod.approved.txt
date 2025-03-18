@@ -1,0 +1,2 @@
+nginx
+gcr.io/google-containers/sidecar
