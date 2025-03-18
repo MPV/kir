@@ -1,0 +1,16 @@
+apiversion: apps/v1
+kind: DaemonSet
+metadata:
+  name: my-daemonset
+spec:
+  selector:
+    matchlabels:
+      app: my
+  template:
+    metadata:
+      labels:
+        app: my
+    spec:
+      containers:
+        - name: my
+          image: gcr.io/google-containers/busybox
