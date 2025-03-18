@@ -8,7 +8,7 @@ import (
 	"github.com/mpv/kir/processor"
 )
 
-func TestProcessor(t *testing.T) {
+func TestKir(t *testing.T) {
 
 	cases := []struct {
 		name string
@@ -16,27 +16,27 @@ func TestProcessor(t *testing.T) {
 	}{
 		{
 			name: "CronJob",
-			file: "processor_test.TestProcessor.CronJob.input.yaml",
+			file: "kir_test.TestKir.CronJob.input.yaml",
 		},
 		{
 			name: "DaemonSet",
-			file: "processor_test.TestProcessor.DaemonSet.input.yaml",
+			file: "kir_test.TestKir.DaemonSet.input.yaml",
 		},
 		{
 			name: "Deployment",
-			file: "processor_test.TestProcessor.Deployment.input.yaml",
+			file: "kir_test.TestKir.Deployment.input.yaml",
 		},
 		{
 			name: "Job",
-			file: "processor_test.TestProcessor.Job.input.yaml",
+			file: "kir_test.TestKir.Job.input.yaml",
 		},
 		{
 			name: "ReplicaSet",
-			file: "processor_test.TestProcessor.ReplicaSet.input.yaml",
+			file: "kir_test.TestKir.ReplicaSet.input.yaml",
 		},
 		{
 			name: "StatefulSet",
-			file: "processor_test.TestProcessor.StatefulSet.input.yaml",
+			file: "kir_test.TestKir.StatefulSet.input.yaml",
 		},
 	}
 
