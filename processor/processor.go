@@ -2,6 +2,7 @@ package processor
 
 import (
 	"bufio"
+	"bytes"
 	"fmt"
 	"io"
 	"os"
@@ -30,5 +31,15 @@ func ProcessFile(filePath string) ([]string, error) {
 	if err != nil {
 		return nil, fmt.Errorf("error reading file: %v", err)
 	}
-	return yamlparser.ProcessData(data)
+
+	var images []string
+	docs := bytes.Split(data, []byte("\n---\n"))
+	for _, doc := range docs {
+		imgs, err := yamlparser.ProcessData(doc)
+		if err != nil {
+			return nil, fmt.Errorf("error processing document: %v", err)
+		}
+		images = append(images, imgs...)
+	}
+	return images, nil
 }

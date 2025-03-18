@@ -18,6 +18,15 @@ spec:
   containers:
   - name: test-container
     image: test-image
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: another-pod
+spec:
+  containers:
+  - name: another-container
+    image: another-image
 `)
 
 	images, err := ProcessFile("test.yaml")
@@ -25,7 +34,7 @@ spec:
 		t.Fatalf("ProcessFile() error = %v", err)
 	}
 
-	expected := []string{"test-image"}
+	expected := []string{"test-image", "another-image"}
 	if len(images) != len(expected) {
 		t.Fatalf("expected %d images, got %d", len(expected), len(images))
 	}
