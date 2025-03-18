@@ -6,8 +6,7 @@ import (
 )
 
 func TestProcessFile(t *testing.T) {
-	dir := setupTestDir(t)
-	defer os.RemoveAll(dir)
+	dir := t.TempDir()
 
 	createTestFile(t, dir, "test.yaml", `
 apiVersion: v1
@@ -29,7 +28,7 @@ spec:
     image: another-image
 `)
 
-	images, err := ProcessFile("test.yaml")
+	images, err := ProcessFile(dir + "/test.yaml")
 	if err != nil {
 		t.Fatalf("ProcessFile() error = %v", err)
 	}
@@ -44,20 +43,6 @@ spec:
 			t.Errorf("expected image %q, got %q", expected[i], img)
 		}
 	}
-}
-
-func setupTestDir(t *testing.T) string {
-	dir, err := os.MkdirTemp("", "test")
-	if err != nil {
-		t.Fatalf("error: %v", err)
-	}
-
-	err = os.Chdir(dir)
-	if err != nil {
-		t.Fatalf("error: %v", err)
-	}
-
-	return dir
 }
 
 func createTestFile(t *testing.T, dir, name, content string) {
