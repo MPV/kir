@@ -79,3 +79,14 @@ func TestError(t *testing.T) {
 		})
 	}
 }
+
+func TestMultiple(t *testing.T) {
+
+	file := "kir_test.TestMultiple.input.yaml"
+	images, err := processor.ProcessFile(file)
+	if err != nil {
+		t.Fatalf("ProcessFile() error = %v", err)
+	}
+	imagesAsString := strings.Join(images, "\n")
+	approvals.VerifyString(t, imagesAsString)
+}
