@@ -4,7 +4,7 @@ metadata:
   name: my-daemonset
 spec:
   selector:
-    matchlabels:
+    matchLabels:
       app: my
   template:
     metadata:
