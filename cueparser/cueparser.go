@@ -14,22 +14,21 @@ func ProcessData(data []byte) ([]string, error) {
 	// Create a CUE context
 	ctx := cuecontext.New()
 
-	// Load the PodSpec schema from the CUE Central Registry
-	bis := load.Instances([]string{"cue.dev/x/k8s.io/api/core/v1"}, nil)
-	if len(bis) == 0 {
-		return nil, fmt.Errorf("failed to load PodSpec schema")
+	// Load the local PodSpec schema
+	schema := `
+	#PodSpec: {
+		containers?: [...#Container]
+		initContainers?: [...#Container]
 	}
 
-	pkgV := ctx.BuildInstance(bis[0])
-	if pkgV.Err() != nil {
-		// If we can't load from the Central Registry, return an error
-		// This will cause the code to fall back to the original implementation
-		return nil, fmt.Errorf("failed to build PodSpec schema: %v", pkgV.Err())
+	#Container: {
+		name: string
+		image: string
 	}
-
-	podSpec := pkgV.LookupPath(cue.ParsePath("#PodSpec"))
-	if podSpec.Err() != nil {
-		return nil, fmt.Errorf("failed to lookup PodSpec: %v", podSpec.Err())
+	`
+	schemaValue := ctx.CompileString(schema)
+	if schemaValue.Err() != nil {
+		return nil, fmt.Errorf("failed to compile schema: %v", schemaValue.Err())
 	}
 
 	// Load the YAML data
@@ -44,7 +43,7 @@ func ProcessData(data []byte) ([]string, error) {
 	}
 
 	// Unify the YAML value with the schema and validate
-	combined := podSpec.Unify(dataValue)
+	combined := schemaValue.LookupPath(cue.ParsePath("#PodSpec")).Unify(dataValue)
 	if err := combined.Validate(cue.Concrete(true)); err != nil {
 		return nil, fmt.Errorf("validation error: %v", err)
 	}
