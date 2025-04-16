@@ -106,16 +106,139 @@ func processWithLocalSchema(data []byte) ([]string, error) {
 	// Create a CUE context
 	ctx := cuecontext.New()
 
-	// Load the local PodSpec schema
+	// Load the local schema with support for all Kubernetes resource types
 	schema := `
-	#PodSpec: {
-		containers?: [...#Container]
-		initContainers?: [...#Container]
-	}
-
 	#Container: {
 		name: string
 		image: string
+		command?: [...string]
+		args?: [...string]
+		ports?: [...{
+			containerPort: int
+			protocol?: string
+			name?: string
+			hostPort?: int
+		}]
+		env?: [...{
+			name: string
+			value?: string
+			valueFrom?: {...}
+		}]
+		volumeMounts?: [...{
+			name: string
+			mountPath: string
+			readOnly?: bool
+		}]
+		resources?: {
+			limits?: {...}
+			requests?: {...}
+		}
+		...
+	}
+
+	#PodSpec: {
+		containers?: [...#Container]
+		initContainers?: [...#Container]
+		volumes?: [...{
+			name: string
+			...
+		}]
+		restartPolicy?: string
+		...
+	}
+
+	#ObjectMeta: {
+		name?: string
+		namespace?: string
+		labels?: [string]: string
+		annotations?: [string]: string
+		...
+	}
+
+	#PodTemplateSpec: {
+		metadata?: #ObjectMeta
+		spec: #PodSpec
+	}
+
+	#Pod: {
+		apiVersion: string
+		kind: "Pod"
+		metadata?: #ObjectMeta
+		spec: #PodSpec
+	}
+
+	#Deployment: {
+		apiVersion: string
+		kind: "Deployment"
+		metadata?: #ObjectMeta
+		spec: {
+			replicas?: int
+			selector?: {...}
+			template: #PodTemplateSpec
+			...
+		}
+	}
+
+	#DaemonSet: {
+		apiVersion: string
+		kind: "DaemonSet"
+		metadata?: #ObjectMeta
+		spec: {
+			selector?: {...}
+			template: #PodTemplateSpec
+			...
+		}
+	}
+
+	#StatefulSet: {
+		apiVersion: string
+		kind: "StatefulSet"
+		metadata?: #ObjectMeta
+		spec: {
+			replicas?: int
+			selector?: {...}
+			template: #PodTemplateSpec
+			...
+		}
+	}
+
+	#ReplicaSet: {
+		apiVersion: string
+		kind: "ReplicaSet"
+		metadata?: #ObjectMeta
+		spec: {
+			replicas?: int
+			selector?: {...}
+			template: #PodTemplateSpec
+			...
+		}
+	}
+
+	#Job: {
+		apiVersion: string
+		kind: "Job"
+		metadata?: #ObjectMeta
+		spec: {
+			template: #PodTemplateSpec
+			...
+		}
+	}
+
+	#CronJob: {
+		apiVersion: string
+		kind: "CronJob"
+		metadata?: #ObjectMeta
+		spec: {
+			schedule: string
+			jobTemplate: {
+				metadata?: #ObjectMeta
+				spec: {
+					template: #PodTemplateSpec
+					...
+				}
+			}
+			...
+		}
 	}
 	`
 	schemaValue := ctx.CompileString(schema)
@@ -134,19 +257,64 @@ func processWithLocalSchema(data []byte) ([]string, error) {
 		return nil, fmt.Errorf("failed to build YAML data: %v", dataValue.Err())
 	}
 
+	// Try to determine the resource kind
+	kindValue := dataValue.LookupPath(cue.ParsePath("kind"))
+	if !kindValue.Exists() {
+		return nil, fmt.Errorf("kind field not found in resource")
+	}
+
+	kind, err := kindValue.String()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get kind string: %v", err)
+	}
+
+	// Get the appropriate schema based on the resource kind
+	var resourceSchema cue.Value
+	switch kind {
+	case "Pod":
+		resourceSchema = schemaValue.LookupPath(cue.ParsePath("#Pod"))
+	case "Deployment":
+		resourceSchema = schemaValue.LookupPath(cue.ParsePath("#Deployment"))
+	case "DaemonSet":
+		resourceSchema = schemaValue.LookupPath(cue.ParsePath("#DaemonSet"))
+	case "StatefulSet":
+		resourceSchema = schemaValue.LookupPath(cue.ParsePath("#StatefulSet"))
+	case "ReplicaSet":
+		resourceSchema = schemaValue.LookupPath(cue.ParsePath("#ReplicaSet"))
+	case "Job":
+		resourceSchema = schemaValue.LookupPath(cue.ParsePath("#Job"))
+	case "CronJob":
+		resourceSchema = schemaValue.LookupPath(cue.ParsePath("#CronJob"))
+	default:
+		return nil, fmt.Errorf("unsupported resource kind: %s", kind)
+	}
+
 	// Unify the YAML value with the schema and validate
-	combined := schemaValue.LookupPath(cue.ParsePath("#PodSpec")).Unify(dataValue)
+	combined := resourceSchema.Unify(dataValue)
 	if err := combined.Validate(cue.Concrete(true)); err != nil {
 		return nil, fmt.Errorf("validation error: %v", err)
 	}
 
-	// Extract container images
+	// Extract container images based on the resource kind
+	var podSpec cue.Value
+	switch kind {
+	case "Pod":
+		podSpec = combined.LookupPath(cue.ParsePath("spec"))
+	case "Deployment", "DaemonSet", "StatefulSet", "ReplicaSet", "Job":
+		podSpec = combined.LookupPath(cue.ParsePath("spec.template.spec"))
+	case "CronJob":
+		podSpec = combined.LookupPath(cue.ParsePath("spec.jobTemplate.spec.template.spec"))
+	}
+
+	if podSpec.Err() != nil {
+		return nil, fmt.Errorf("failed to get PodSpec: %v", podSpec.Err())
+	}
+
 	var images []string
 
-	// Try to get containers from the validated PodSpec
-	containersValue := combined.LookupPath(cue.ParsePath("containers"))
+	// Extract container images from the PodSpec
+	containersValue := podSpec.LookupPath(cue.ParsePath("containers"))
 	if containersValue.Exists() {
-		// Iterate through containers
 		iter, err := containersValue.List()
 		if err != nil {
 			return nil, fmt.Errorf("failed to iterate containers: %v", err)
@@ -165,10 +333,9 @@ func processWithLocalSchema(data []byte) ([]string, error) {
 		}
 	}
 
-	// Try to get initContainers from the validated PodSpec
-	initContainersValue := combined.LookupPath(cue.ParsePath("initContainers"))
+	// Extract init container images from the PodSpec
+	initContainersValue := podSpec.LookupPath(cue.ParsePath("initContainers"))
 	if initContainersValue.Exists() {
-		// Iterate through initContainers
 		iter, err := initContainersValue.List()
 		if err != nil {
 			return nil, fmt.Errorf("failed to iterate initContainers: %v", err)
@@ -192,18 +359,7 @@ func processWithLocalSchema(data []byte) ([]string, error) {
 
 // ProcessKubernetesYAML processes a Kubernetes YAML document and extracts container images
 func ProcessKubernetesYAML(data []byte) ([]string, error) {
-	// First, try to extract the PodSpec directly
-	images, err := ProcessData(data)
-	if err == nil && len(images) > 0 {
-		return images, nil
-	}
-
-	// If that fails, try to extract the PodSpec from a Kubernetes resource
-	// This is a simplified approach - in a real implementation, you would need to
-	// handle different Kubernetes resource types (Deployment, StatefulSet, etc.)
-
-	// For now, we'll just return the error from the first attempt
-	return nil, fmt.Errorf("failed to extract PodSpec: %v", err)
+	return ProcessData(data)
 }
 
 // ProcessKubernetesListYAML processes a Kubernetes List YAML document and extracts container images

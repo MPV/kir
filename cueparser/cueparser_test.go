@@ -12,32 +12,51 @@ func TestProcessData(t *testing.T) {
 		wantErr bool
 	}{
 		{
-			name: "Valid PodSpec with containers",
+			name: "Valid Pod with containers",
 			data: []byte(`
-containers:
+apiVersion: v1
+kind: Pod
+metadata:
+  name: test-pod
+spec:
+  containers:
   - name: test-container
     image: test-image
+    command: ["echo", "hello"]
+    ports:
+    - containerPort: 8080
 `),
 			want:    []string{"test-image"},
 			wantErr: false,
 		},
 		{
-			name: "Valid PodSpec with initContainers",
+			name: "Valid Pod with initContainers",
 			data: []byte(`
-initContainers:
+apiVersion: v1
+kind: Pod
+metadata:
+  name: test-pod
+spec:
+  initContainers:
   - name: init-container
     image: init-image
+    command: ["echo", "init"]
 `),
 			want:    []string{"init-image"},
 			wantErr: false,
 		},
 		{
-			name: "Valid PodSpec with both containers and initContainers",
+			name: "Valid Pod with both containers and initContainers",
 			data: []byte(`
-containers:
+apiVersion: v1
+kind: Pod
+metadata:
+  name: test-pod
+spec:
+  containers:
   - name: test-container
     image: test-image
-initContainers:
+  initContainers:
   - name: init-container
     image: init-image
 `),
@@ -45,9 +64,12 @@ initContainers:
 			wantErr: false,
 		},
 		{
-			name: "Invalid PodSpec (missing required fields)",
+			name: "Invalid Pod (missing required fields)",
 			data: []byte(`
-containers:
+apiVersion: v1
+kind: Pod
+spec:
+  containers:
   - image: test-image
 `),
 			want:    nil,
@@ -85,14 +107,23 @@ func TestProcessKubernetesListYAML(t *testing.T) {
 		wantErr bool
 	}{
 		{
-			name: "Multiple PodSpecs",
+			name: "Multiple Pods",
 			data: []byte(`
----
-containers:
+apiVersion: v1
+kind: Pod
+metadata:
+  name: pod1
+spec:
+  containers:
   - name: container1
     image: image1
 ---
-containers:
+apiVersion: v1
+kind: Pod
+metadata:
+  name: pod2
+spec:
+  containers:
   - name: container2
     image: image2
 `),
@@ -100,14 +131,21 @@ containers:
 			wantErr: false,
 		},
 		{
-			name: "Mixed valid and invalid PodSpecs",
+			name: "Mixed valid and invalid Pods",
 			data: []byte(`
----
-containers:
+apiVersion: v1
+kind: Pod
+metadata:
+  name: pod1
+spec:
+  containers:
   - name: container1
     image: image1
 ---
-containers:
+apiVersion: v1
+kind: Pod
+spec:
+  containers:
   - image: image2
 `),
 			want:    []string{"image1"},
