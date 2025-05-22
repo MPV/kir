@@ -1,5 +1,5 @@
-github.com/approvals/go-approval-tests v1.2.0 h1:0gnbtkFLryEa7ojI6YSP5SeBHOfYHCWFnOTM8q9BQz4=
-github.com/approvals/go-approval-tests v1.2.0/go.mod h1:Jw45q7bEifPpUkRU2S5GCthnwDxMUWPHTGcNewVh6mw=
+github.com/approvals/go-approval-tests v1.5.1 h1:dNoQ5/Qj6E4TAJGnk5h6VOX/t+EMWate4ek/65IgdbQ=
+github.com/approvals/go-approval-tests v1.5.1/go.mod h1:i7AlHlLqLyxTby+MnSFgxkObjFlsywI46fnOitjMBiU=
 github.com/creack/pty v1.1.9/go.mod h1:oKZEueFk5CKHvIhNR5MUki03XCEU+Q6VDXinZuGJ33E=
 github.com/davecgh/go-spew v1.1.0/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
 github.com/davecgh/go-spew v1.1.1/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
