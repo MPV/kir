@@ -57,6 +57,7 @@ func TestKind(t *testing.T) {
 }
 
 func TestError(t *testing.T) {
+	t.Parallel()
 
 	cases := []struct {
 		name string
@@ -72,10 +73,19 @@ func TestError(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			images, err := processor.ProcessFile(tc.file)
 			if err == nil {
-				t.Fatalf("ProcessFile() error = %v", err)
+				t.Fatalf("ProcessFile() expected error but got nil")
 			}
-			imagesAsString := strings.Join(images, "\n")
-			approvals.VerifyString(t, imagesAsString)
+			
+			// Test stdout output
+			stdoutOutput := ""
+			if len(images) > 0 {
+				stdoutOutput = strings.Join(images, "\n")
+			}
+			approvals.VerifyString(t, stdoutOutput, approvals.Options().ForFile().WithAdditionalInformation("stdout"))
+			
+			// Test stderr output
+			stderrOutput := err.Error()
+			approvals.VerifyString(t, stderrOutput, approvals.Options().ForFile().WithAdditionalInformation("stderr"))
 		})
 	}
 }
