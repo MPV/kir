@@ -72,10 +72,17 @@ func TestError(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			images, err := processor.ProcessFile(tc.file)
 			if err == nil {
-				t.Fatalf("ProcessFile() error = %v", err)
+				t.Fatalf("ProcessFile() expected an error but got nil")
 			}
-			imagesAsString := strings.Join(images, "\n")
-			approvals.VerifyString(t, imagesAsString)
+
+			// Approve stdout (the images) and stderr (the error message)
+			// separately, so a change to either stream is a distinct,
+			// reviewable golden-file diff.
+			stdout := strings.Join(images, "\n")
+			approvals.VerifyString(t, stdout, approvals.Options().ForFile().WithAdditionalInformation("stdout"))
+
+			stderr := err.Error()
+			approvals.VerifyString(t, stderr, approvals.Options().ForFile().WithAdditionalInformation("stderr"))
 		})
 	}
 }
