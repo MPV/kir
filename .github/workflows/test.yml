@@ -24,8 +24,25 @@ jobs:
         with:
           go-version: ${{ steps.go-version.outputs.go-version }}
 
-      - name: Install dependencies
-        run: go mod tidy
+      - name: Download dependencies
+        run: go mod download
+
+      - name: Check formatting
+        run: |
+          unformatted=$(gofmt -l .)
+          if [ -n "$unformatted" ]; then
+            echo "The following files are not gofmt-ed:"
+            echo "$unformatted"
+            exit 1
+          fi
+
+      - name: Vet
+        run: go vet ./...
+
+      - name: Verify go.mod and go.sum are tidy
+        run: |
+          go mod tidy
+          git diff --exit-code -- go.mod go.sum
 
       - name: Run tests
-        run: go test ./...
+        run: go test -race ./...
