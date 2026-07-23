@@ -9,7 +9,7 @@ import (
 )
 
 // GetPodSpec extracts the PodSpec from a Kubernetes object
-func GetPodSpec(obj interface{}) (*corev1.PodSpec, error) {
+func GetPodSpec(obj any) (*corev1.PodSpec, error) {
 	switch resource := obj.(type) {
 	case *corev1.Pod:
 		return &resource.Spec, nil
@@ -38,7 +38,7 @@ func GetContainerImages(containers []corev1.Container) []string {
 	return images
 }
 
-func GetContainersFromObject(obj interface{}) ([]corev1.Container, error) {
+func GetContainersFromObject(obj any) ([]corev1.Container, error) {
 	podSpec, err := GetPodSpec(obj)
 	if err != nil {
 		return nil, err

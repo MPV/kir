@@ -12,7 +12,7 @@ import (
 func TestGetPodSpec(t *testing.T) {
 	tests := []struct {
 		name    string
-		obj     interface{}
+		obj     any
 		wantErr bool
 	}{
 		{"Pod", &corev1.Pod{}, false},
@@ -75,7 +75,7 @@ func TestGetPodSpecSupported(t *testing.T) {
 
 	tests := []struct {
 		name string
-		obj  interface{}
+		obj  any
 	}{
 		{"Deployment", &appsv1.Deployment{
 			Spec: appsv1.DeploymentSpec{
@@ -176,7 +176,7 @@ func TestGetContainerImages(t *testing.T) {
 func TestGetContainersFromObject(t *testing.T) {
 	tests := []struct {
 		name    string
-		obj     interface{}
+		obj     any
 		want    []corev1.Container
 		wantErr bool
 	}{
