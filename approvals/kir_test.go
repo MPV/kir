@@ -8,85 +8,42 @@ import (
 	"github.com/mpv/kir/processor"
 )
 
-func TestKind(t *testing.T) {
+// verify processes file and approves what the tool would print to stdout (the
+// images) and to stderr (the error message, if any) as two separate golden
+// files. Expected behavior lives entirely in the goldens: a change to either
+// stream — an image appearing or disappearing, or an error starting or
+// stopping — surfaces as a reviewable diff.
+func verify(t *testing.T, file string) {
+	t.Helper()
 
-	cases := []struct {
-		name string
-		file string
-	}{
-		{
-			name: "Pod",
-			file: "kir_test.TestKind.Pod.input.yaml",
-		},
-		{
-			name: "CronJob",
-			file: "kir_test.TestKind.CronJob.input.yaml",
-		},
-		{
-			name: "DaemonSet",
-			file: "kir_test.TestKind.DaemonSet.input.yaml",
-		},
-		{
-			name: "Deployment",
-			file: "kir_test.TestKind.Deployment.input.yaml",
-		},
-		{
-			name: "Job",
-			file: "kir_test.TestKind.Job.input.yaml",
-		},
-		{
-			name: "ReplicaSet",
-			file: "kir_test.TestKind.ReplicaSet.input.yaml",
-		},
-		{
-			name: "StatefulSet",
-			file: "kir_test.TestKind.StatefulSet.input.yaml",
-		},
+	images, err := processor.ProcessFile(file)
+
+	stdout := strings.Join(images, "\n")
+	approvals.VerifyString(t, stdout, approvals.Options().ForFile().WithAdditionalInformation("stdout"))
+
+	stderr := ""
+	if err != nil {
+		stderr = err.Error()
 	}
+	approvals.VerifyString(t, stderr, approvals.Options().ForFile().WithAdditionalInformation("stderr"))
+}
 
-	for _, tc := range cases {
-		t.Run(tc.name, func(t *testing.T) {
-			images, err := processor.ProcessFile(tc.file)
-			if err != nil {
-				t.Fatalf("ProcessFile() error = %v", err)
-			}
-			imagesAsString := strings.Join(images, "\n")
-			approvals.VerifyString(t, imagesAsString)
+func TestKind(t *testing.T) {
+	kinds := []string{"Pod", "CronJob", "DaemonSet", "Deployment", "Job", "ReplicaSet", "StatefulSet"}
+
+	for _, kind := range kinds {
+		t.Run(kind, func(t *testing.T) {
+			verify(t, "kir_test.TestKind."+kind+".input.yaml")
 		})
 	}
 }
 
 func TestError(t *testing.T) {
-
-	cases := []struct {
-		name string
-		file string
-	}{
-		{
-			name: "Service",
-			file: "kir_test.TestError.Service.input.yaml",
-		},
-	}
-
-	for _, tc := range cases {
-		t.Run(tc.name, func(t *testing.T) {
-			images, err := processor.ProcessFile(tc.file)
-			if err == nil {
-				t.Fatalf("ProcessFile() error = %v", err)
-			}
-			imagesAsString := strings.Join(images, "\n")
-			approvals.VerifyString(t, imagesAsString)
-		})
-	}
+	t.Run("Service", func(t *testing.T) {
+		verify(t, "kir_test.TestError.Service.input.yaml")
+	})
 }
 
 func TestMultiple(t *testing.T) {
-
-	file := "kir_test.TestMultiple.input.yaml"
-	images, err := processor.ProcessFile(file)
-	if err != nil {
-		t.Fatalf("ProcessFile() error = %v", err)
-	}
-	imagesAsString := strings.Join(images, "\n")
-	approvals.VerifyString(t, imagesAsString)
+	verify(t, "kir_test.TestMultiple.input.yaml")
 }
