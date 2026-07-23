@@ -38,10 +38,20 @@ func TestKind(t *testing.T) {
 	}
 }
 
-func TestError(t *testing.T) {
+// Non-workload documents (e.g. a Service) are skipped rather than treated as
+// errors. Through verify() this shows up as the stderr golden going from the
+// old "unsupported kind Service" error to empty.
+func TestSkipsNonWorkloads(t *testing.T) {
 	t.Run("Service", func(t *testing.T) {
-		verify(t, "kir_test.TestError.Service.input.yaml")
+		verify(t, "kir_test.TestSkipsNonWorkloads.Service.input.yaml")
 	})
+}
+
+// A file that mixes supported workloads with a non-workload document yields the
+// images from the workloads; the non-workload document is skipped without
+// discarding the rest.
+func TestMixed(t *testing.T) {
+	verify(t, "kir_test.TestMixed.WorkloadAndService.input.yaml")
 }
 
 func TestMultiple(t *testing.T) {
