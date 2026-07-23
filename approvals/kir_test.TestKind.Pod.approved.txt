@@ -1,2 +1,3 @@
 nginx
 gcr.io/google-containers/sidecar
+busybox:1.28

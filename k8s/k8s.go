@@ -47,5 +47,8 @@ func GetContainersFromObject(obj interface{}) ([]corev1.Container, error) {
 	var containers []corev1.Container
 	containers = append(containers, podSpec.Containers...)
 	containers = append(containers, podSpec.InitContainers...)
+	for _, ec := range podSpec.EphemeralContainers {
+		containers = append(containers, corev1.Container(ec.EphemeralContainerCommon))
+	}
 	return containers, nil
 }
