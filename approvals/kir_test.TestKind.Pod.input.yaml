@@ -12,3 +12,7 @@ spec:
     - name: init-mysidecar
       image: gcr.io/google-containers/sidecar
       restartPolicy: Always
+  ephemeralContainers:
+    - name: debugger
+      image: busybox:1.28
+      targetContainerName: myapp

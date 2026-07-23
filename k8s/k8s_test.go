@@ -221,6 +221,33 @@ func TestGetContainersFromObject(t *testing.T) {
 			wantErr: false,
 		},
 		{
+			name: "Pod with ephemeral container",
+			obj: &corev1.Pod{
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
+						{Name: "container1", Image: "image1"},
+					},
+					InitContainers: []corev1.Container{
+						{Name: "init-container1", Image: "init-image1"},
+					},
+					EphemeralContainers: []corev1.EphemeralContainer{
+						{
+							EphemeralContainerCommon: corev1.EphemeralContainerCommon{
+								Name:  "debugger",
+								Image: "ephemeral-image1",
+							},
+						},
+					},
+				},
+			},
+			want: []corev1.Container{
+				{Name: "container1", Image: "image1"},
+				{Name: "init-container1", Image: "init-image1"},
+				{Name: "debugger", Image: "ephemeral-image1"},
+			},
+			wantErr: false,
+		},
+		{
 			name:    "Invalid",
 			obj:     "invalid",
 			want:    nil,
