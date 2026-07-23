@@ -22,16 +22,16 @@
 ### Get images for a manifest:
 
 ```shell
-$ go run main.go examples/statefulset.yaml
+$ go run main.go approvals/kir_test.TestKind.StatefulSet.input.yaml
 registry.k8s.io/nginx-slim:0.8
 gcr.io/google-containers/sidecar
 kiwigrid/k8s-sidecar
 ```
 
-### Get images for all manifests in a folder:
+### Get images for all manifests matching a glob:
 
 ```shell
-$ go run main.go examples/* | sort -u
+$ go run main.go approvals/kir_test.TestKind.*.input.yaml | sort -u
 busybox:1.28
 gcr.io/google-containers/busybox
 gcr.io/google-containers/sidecar
@@ -55,11 +55,11 @@ $ kubectl get pod -A -o yaml | go run main.go - | sort -u
 
 ```shell
 # Syft:
-$ go run main.go examples/job.yaml | xargs syft
+$ go run main.go approvals/kir_test.TestKind.Job.input.yaml | xargs syft
 
 # Snyk:
-$ go run main.go examples/job.yaml | xargs snyk container test
+$ go run main.go approvals/kir_test.TestKind.Job.input.yaml | xargs snyk container test
 
 # Docker Scout
-$ go run main.go examples/job.yaml | xargs docker scout cves
+$ go run main.go approvals/kir_test.TestKind.Job.input.yaml | xargs docker scout cves
 ```
