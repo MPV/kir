@@ -1,7 +1,6 @@
 package processor
 
 import (
-	"bufio"
 	"bytes"
 	"fmt"
 	"io"
@@ -11,19 +10,11 @@ import (
 )
 
 func ProcessStdin() ([]string, error) {
-	reader := bufio.NewReader(os.Stdin)
-	var data []byte
-	for {
-		line, err := reader.ReadBytes('\n')
-		if err != nil && err != io.EOF {
-			return nil, fmt.Errorf("error reading stdin: %v", err)
-		}
-		data = append(data, line...)
-		if err == io.EOF {
-			break
-		}
+	data, err := io.ReadAll(os.Stdin)
+	if err != nil {
+		return nil, fmt.Errorf("error reading stdin: %v", err)
 	}
-	return yamlparser.ProcessData(data)
+	return processDocuments(data)
 }
 
 func ProcessFile(filePath string) ([]string, error) {
@@ -31,7 +22,13 @@ func ProcessFile(filePath string) ([]string, error) {
 	if err != nil {
 		return nil, fmt.Errorf("error reading file: %v", err)
 	}
+	return processDocuments(data)
+}
 
+// processDocuments splits a (possibly multi-document) YAML stream and collects
+// the images from every document. Both the file and stdin paths go through it
+// so they handle multi-document input identically.
+func processDocuments(data []byte) ([]string, error) {
 	var images []string
 	docs := bytes.Split(data, []byte("\n---\n"))
 	for _, doc := range docs {
