@@ -1,2 +1,3 @@
 .approval_tests_temp
 approvals/*.received.txt
+cmd/*.received.txt

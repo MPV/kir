@@ -14,8 +14,9 @@ func init() {
 func main() {
 	if len(os.Args) < 2 {
 		log.Fatal("Usage: kir <file_path> [<file_path_2> ...] or kir -")
-		return
 	}
 
-	cmd.Execute(os.Args[1:])
+	if err := cmd.Execute(os.Args[1:], os.Stdout); err != nil {
+		log.Fatalf("error: %v", err)
+	}
 }

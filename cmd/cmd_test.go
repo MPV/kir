@@ -2,16 +2,14 @@ package cmd
 
 import (
 	"bytes"
-	"log"
 	"os"
+	"path/filepath"
 	"testing"
+
+	approvals "github.com/approvals/go-approval-tests"
 )
 
-func TestExecuteFile(t *testing.T) {
-	dir := setupTestDir(t)
-	defer os.RemoveAll(dir)
-
-	createTestFile(dir, "test.yaml", `
+const podManifest = `
 apiVersion: v1
 kind: Pod
 metadata:
@@ -20,109 +18,73 @@ spec:
   containers:
   - name: test-container
     image: test-image
-`)
+`
 
-	testCases := []struct {
-		args           []string
-		expectedOutput string
-	}{
-		{[]string{"test.yaml"}, "test-image\n"},
+// verifyExecute runs Execute and approves what it writes (stdout) and the
+// error it returns (stderr) as separate golden files, so a change to either
+// stream in a later PR is a distinct, reviewable diff.
+func verifyExecute(t *testing.T, args []string) {
+	t.Helper()
+
+	var out bytes.Buffer
+	err := Execute(args, &out)
+
+	approvals.VerifyString(t, out.String(), approvals.Options().ForFile().WithAdditionalInformation("stdout"))
+
+	stderr := ""
+	if err != nil {
+		stderr = err.Error()
 	}
+	approvals.VerifyString(t, stderr, approvals.Options().ForFile().WithAdditionalInformation("stderr"))
+}
 
-	for _, tc := range testCases {
-		t.Run(tc.args[0], func(t *testing.T) {
-			oldStdout := os.Stdout
-			r, w, _ := os.Pipe()
-			os.Stdout = w
+func TestExecuteFile(t *testing.T) {
+	dir := t.TempDir()
+	writeFile(t, filepath.Join(dir, "test.yaml"), podManifest)
+	t.Chdir(dir)
 
-			os.Args = append([]string{"cmd"}, tc.args...)
-			Execute(tc.args)
-
-			w.Close()
-			os.Stdout = oldStdout
-
-			var buf bytes.Buffer
-			_, err := buf.ReadFrom(r)
-			if err != nil {
-				t.Fatalf("Error reading from buffer: %v", err)
-			}
-			output := buf.String()
-
-			if output != tc.expectedOutput {
-				t.Errorf("expected %q, got %q", tc.expectedOutput, output)
-			}
-		})
-	}
+	verifyExecute(t, []string{"test.yaml"})
 }
 
 func TestExecuteStdin(t *testing.T) {
-	testCases := []struct {
-		args           []string
-		input          string
-		expectedOutput string
-	}{
-		{[]string{"-"}, `
-apiVersion: v1
-kind: Pod
-metadata:
-  name: test-pod
-spec:
-  containers:
-  - name: test-container
-    image: test-image
-`, "test-image\n"},
-	}
+	withStdin(t, podManifest)
 
-	for _, tc := range testCases {
-		t.Run(tc.args[0], func(t *testing.T) {
-			oldStdout := os.Stdout
-			r, w, _ := os.Pipe()
-			os.Stdout = w
+	verifyExecute(t, []string{"-"})
+}
 
-			oldStdin := os.Stdin
-			stdinR, stdinW, _ := os.Pipe()
-			os.Stdin = stdinR
-			stdinW.Write([]byte(tc.input))
-			stdinW.Close()
+// One good file alongside one that fails to parse. The good file's images are
+// still written; whether the failure surfaces on stderr is what later PRs
+// change.
+func TestExecuteFileFailure(t *testing.T) {
+	dir := t.TempDir()
+	writeFile(t, filepath.Join(dir, "good.yaml"), podManifest)
+	writeFile(t, filepath.Join(dir, "bad.yaml"), "this: is: not: valid: yaml:\n  - [unclosed\n")
+	t.Chdir(dir)
 
-			os.Args = append([]string{"cmd"}, tc.args...)
-			Execute(tc.args)
+	verifyExecute(t, []string{"good.yaml", "bad.yaml"})
+}
 
-			w.Close()
-			os.Stdout = oldStdout
-			os.Stdin = oldStdin
-
-			var buf bytes.Buffer
-			_, err := buf.ReadFrom(r)
-			if err != nil {
-				t.Fatalf("Error reading from buffer: %v", err)
-			}
-			output := buf.String()
-
-			if output != tc.expectedOutput {
-				t.Errorf("expected %q, got %q", tc.expectedOutput, output)
-			}
-		})
+func writeFile(t *testing.T, path, content string) {
+	t.Helper()
+	if err := os.WriteFile(path, []byte(content), 0644); err != nil {
+		t.Fatalf("writing %s: %v", path, err)
 	}
 }
 
-func setupTestDir(t *testing.T) string {
-	dir, err := os.MkdirTemp("", "test")
+// withStdin replaces os.Stdin with a pipe carrying input for the duration of
+// the test, restoring it afterwards.
+func withStdin(t *testing.T, input string) {
+	t.Helper()
+	r, w, err := os.Pipe()
 	if err != nil {
-		t.Fatalf("error: %v", err)
+		t.Fatalf("creating pipe: %v", err)
 	}
+	old := os.Stdin
+	os.Stdin = r
+	t.Cleanup(func() { os.Stdin = old })
 
-	err = os.Chdir(dir)
-	if err != nil {
-		t.Fatalf("error: %v", err)
+	if _, err := w.WriteString(input); err != nil {
+		t.Fatalf("writing to stdin pipe: %v", err)
 	}
-
-	return dir
-}
-
-func createTestFile(dir, name, content string) {
-	err := os.WriteFile(dir+"/"+name, []byte(content), 0644)
-	if err != nil {
-		log.Fatalf("error: %v", err)
-	}
+	w.Close()
 }
