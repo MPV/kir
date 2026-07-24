@@ -67,3 +67,12 @@ func TestFindFiles(t *testing.T) {
 		})
 	}
 }
+
+// A path that names nothing (a typo'd or missing file) must be reported as an
+// error rather than silently ignored.
+func TestFindFilesMissing(t *testing.T) {
+	missing := filepath.Join(t.TempDir(), "does-not-exist.yaml")
+	if _, err := FindFiles([]string{missing}); err == nil {
+		t.Fatalf("FindFiles(%q) returned nil error for a missing path", missing)
+	}
+}
