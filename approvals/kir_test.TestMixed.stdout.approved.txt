@@ -1,0 +1,2 @@
+nginx:1.27
+migrate:v2
