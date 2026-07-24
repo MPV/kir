@@ -1,7 +1,9 @@
 package yamlparser
 
 import (
+	"bufio"
 	"fmt"
+	"io"
 	"slices"
 
 	"github.com/mpv/kir/k8s"
@@ -9,10 +11,36 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
+	utilyaml "k8s.io/apimachinery/pkg/util/yaml"
 	"k8s.io/client-go/kubernetes/scheme"
 )
 
 var supportedKinds = []string{"Pod", "Deployment", "DaemonSet", "ReplicaSet", "StatefulSet", "Job", "CronJob"}
+
+// ProcessReader reads a (possibly multi-document) YAML stream and returns the
+// container images of every supported workload it contains. Documents are
+// separated using the Kubernetes YAML reader, which correctly handles leading
+// and trailing "---" separators, separators followed by trailing whitespace,
+// CRLF line endings, and a final document without a trailing newline.
+func ProcessReader(r io.Reader) ([]string, error) {
+	var images []string
+	reader := utilyaml.NewYAMLReader(bufio.NewReader(r))
+	for {
+		doc, err := reader.Read()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			return nil, fmt.Errorf("error reading YAML document: %v", err)
+		}
+		imgs, err := ProcessData(doc)
+		if err != nil {
+			return nil, err
+		}
+		images = append(images, imgs...)
+	}
+	return images, nil
+}
 
 func ProcessData(data []byte) ([]string, error) {
 	// Decode the YAML file into a Kubernetes object
