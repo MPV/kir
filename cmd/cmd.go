@@ -25,6 +25,10 @@ var (
 // Run performs no os.Exit and touches neither os.Stdin/os.Stdout/os.Stderr nor
 // the global logger, so the whole CLI contract — argv and stdin in, and stdout,
 // stderr, and exit code out — is exercised by an in-process call.
+//
+// If any file fails to process, its error is logged and the remaining files are
+// still processed, but Run returns a non-zero exit code: a tool that feeds an
+// image scanner must not report success when some manifests could not be read.
 func Run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	logger := log.New(stderr, "", 0)
 
@@ -57,12 +61,18 @@ func Run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 		logger.Printf("error: %v", err)
 		return 1
 	}
+	failures := 0
 	for _, filePath := range files {
 		images, err := processor.ProcessFile(filePath)
 		if err != nil {
 			logger.Printf("error: %v", err)
+			failures++
+			continue
 		}
 		printImages(stdout, images)
+	}
+	if failures > 0 {
+		return 1
 	}
 	return 0
 }
