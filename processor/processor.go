@@ -1,7 +1,6 @@
 package processor
 
 import (
-	"bufio"
 	"bytes"
 	"fmt"
 	"io"
@@ -10,18 +9,13 @@ import (
 	"github.com/mpv/kir/yamlparser"
 )
 
-func ProcessStdin() ([]string, error) {
-	reader := bufio.NewReader(os.Stdin)
-	var data []byte
-	for {
-		line, err := reader.ReadBytes('\n')
-		if err != nil && err != io.EOF {
-			return nil, fmt.Errorf("error reading stdin: %v", err)
-		}
-		data = append(data, line...)
-		if err == io.EOF {
-			break
-		}
+// ProcessStdin reads a manifest stream from r and returns its images. Taking an
+// io.Reader (rather than reading os.Stdin directly) keeps it testable and lets
+// the CLI inject stdin.
+func ProcessStdin(r io.Reader) ([]string, error) {
+	data, err := io.ReadAll(r)
+	if err != nil {
+		return nil, fmt.Errorf("error reading stdin: %v", err)
 	}
 	return yamlparser.ProcessData(data)
 }
