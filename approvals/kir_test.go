@@ -61,6 +61,18 @@ func TestCLI(t *testing.T) {
 		verify(t, []string{"-"}, f)
 	})
 
+	// StdinMultiDoc pins the multi-document stdin contract: every document in a
+	// piped stream is processed, not just the first. Without this the single-doc
+	// Stdin case above passes regardless, so the regression would go unnoticed.
+	t.Run("StdinMultiDoc", func(t *testing.T) {
+		f, err := os.Open("kir_test.TestCLI.StdinMultiDoc.input.yaml")
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer f.Close()
+		verify(t, []string{"-"}, f)
+	})
+
 	t.Run("MissingFile", func(t *testing.T) {
 		verify(t, []string{"does-not-exist.yaml"}, nil)
 	})
