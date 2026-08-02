@@ -1,0 +1,1 @@
+Usage: kir <file_path> [<file_path_2> ...] or kir -

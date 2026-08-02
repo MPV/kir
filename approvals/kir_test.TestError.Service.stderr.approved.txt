@@ -1,1 +1,1 @@
-error processing document: unsupported kind Service
+error: error processing document: unsupported kind Service
