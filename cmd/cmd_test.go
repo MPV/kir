@@ -71,6 +71,30 @@ func TestRunStdin(t *testing.T) {
 	}
 }
 
+// A file that cannot be processed makes Run exit non-zero, while the images
+// from the files that succeeded are still written.
+func TestRunFileFailure(t *testing.T) {
+	dir := t.TempDir()
+	good := filepath.Join(dir, "good.yaml")
+	bad := filepath.Join(dir, "bad.yaml")
+	if err := os.WriteFile(good, []byte(podManifest), 0644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(bad, []byte("this: is: not: valid: yaml:\n  - [unclosed\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	var stdout, stderr bytes.Buffer
+	code := Run([]string{good, bad}, nil, &stdout, &stderr)
+
+	if code != 1 {
+		t.Errorf("exit code = %d, want 1", code)
+	}
+	if got, want := stdout.String(), "test-image\n"; got != want {
+		t.Errorf("stdout = %q, want the good file's image %q", got, want)
+	}
+}
+
 func TestRunNoArgs(t *testing.T) {
 	var stdout, stderr bytes.Buffer
 	code := Run(nil, nil, &stdout, &stderr)
