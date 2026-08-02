@@ -1,0 +1,15 @@
+# A manifest piped on stdin (kir -).
+stdin pod.yaml
+kir -
+cmp stdout want
+
+-- pod.yaml --
+apiVersion: v1
+kind: Pod
+metadata:
+  name: p
+spec:
+  containers:
+  - image: redis:7
+-- want --
+redis:7

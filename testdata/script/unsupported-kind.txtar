@@ -1,0 +1,14 @@
+# A non-workload kind (Service): kir reports the error on stderr, prints
+# nothing to stdout, and exits 0.
+kir svc.yaml
+! stdout .
+stderr 'unsupported kind Service'
+
+-- svc.yaml --
+apiVersion: v1
+kind: Service
+metadata:
+  name: s
+spec:
+  ports:
+  - port: 80

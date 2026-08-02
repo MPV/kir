@@ -1,0 +1,4 @@
+# A path that matches nothing is ignored: no output, exit 0.
+kir does-not-exist.yaml
+! stdout .
+! stderr .

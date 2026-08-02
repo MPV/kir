@@ -1,0 +1,23 @@
+# Several file arguments: images concatenated in argument order.
+kir a.yaml b.yaml
+cmp stdout want
+
+-- a.yaml --
+apiVersion: v1
+kind: Pod
+metadata:
+  name: a
+spec:
+  containers:
+  - image: alpine:3.20
+-- b.yaml --
+apiVersion: v1
+kind: Pod
+metadata:
+  name: b
+spec:
+  containers:
+  - image: busybox:1.36
+-- want --
+alpine:3.20
+busybox:1.36

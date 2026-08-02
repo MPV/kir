@@ -1,0 +1,4 @@
+# No arguments: usage message on stderr and a non-zero exit code.
+! kir
+stderr 'Usage: kir'
+! stdout .

@@ -1,0 +1,17 @@
+# A single manifest: its container image is written to stdout, nothing to stderr.
+kir deploy.yaml
+cmp stdout want
+! stderr .
+
+-- deploy.yaml --
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: web
+spec:
+  template:
+    spec:
+      containers:
+      - image: nginx:1.27
+-- want --
+nginx:1.27

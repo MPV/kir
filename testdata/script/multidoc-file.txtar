@@ -1,0 +1,26 @@
+# Multiple documents in one file (--- separated): every document's images, in
+# document order.
+kir multi.yaml
+cmp stdout want
+
+-- multi.yaml --
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: j
+spec:
+  template:
+    spec:
+      containers:
+      - image: perl
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: p
+spec:
+  containers:
+  - image: nginx
+-- want --
+perl
+nginx
