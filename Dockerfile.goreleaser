@@ -1,0 +1,7 @@
+# Build context is assembled by GoReleaser: the pre-built `kir` binary for the
+# target platform is copied in, so there is no build step here.
+FROM gcr.io/distroless/static:nonroot
+WORKDIR /
+COPY kir /kir
+USER 65532:65532
+ENTRYPOINT ["/kir"]

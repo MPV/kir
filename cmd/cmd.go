@@ -10,6 +10,13 @@ import (
 	"github.com/mpv/kir/processor"
 )
 
+// Build metadata, injected at release time via -ldflags by GoReleaser.
+var (
+	version = "dev"
+	commit  = "none"
+	date    = "unknown"
+)
+
 // Run executes the kir CLI and returns the process exit code. A single "-"
 // argument reads a manifest stream from stdin; otherwise the arguments are
 // treated as files, directories, or globs. Images are written to stdout and
@@ -22,21 +29,27 @@ func Run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	logger := log.New(stderr, "", 0)
 
 	if len(args) == 0 {
-		logger.Print("Usage: kir <file_path> [<file_path_2> ...] or kir -")
+		logger.Print("Usage: kir <file_path> [<file_path_2> ...] | kir - | kir --version")
 		return 1
 	}
 
-	if len(args) == 1 && args[0] == "-" {
-		if stdin == nil {
-			stdin = strings.NewReader("")
+	if len(args) == 1 {
+		switch args[0] {
+		case "-":
+			if stdin == nil {
+				stdin = strings.NewReader("")
+			}
+			images, err := processor.ProcessStdin(stdin)
+			if err != nil {
+				logger.Printf("error: %v", err)
+				return 1
+			}
+			printImages(stdout, images)
+			return 0
+		case "--version", "-v":
+			fmt.Fprintf(stdout, "kir %s (commit %s, built %s)\n", version, commit, date)
+			return 0
 		}
-		images, err := processor.ProcessStdin(stdin)
-		if err != nil {
-			logger.Printf("error: %v", err)
-			return 1
-		}
-		printImages(stdout, images)
-		return 0
 	}
 
 	files, err := fileutil.FindFiles(args)

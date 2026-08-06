@@ -1,2 +1,5 @@
 .approval_tests_temp
 approvals/*.received.txt
+
+# GoReleaser build output
+dist/
