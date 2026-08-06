@@ -5,5 +5,15 @@
   ],
   "postUpdateOptions": [
     "gomodTidy"
+  ],
+  "semanticCommits": "enabled",
+  "packageRules": [
+    {
+      "description": "CI-only bumps (GitHub Actions) use a non-releasing type so they don't cut a release; go modules and the Docker base image stay fix -> patch since they change the shipped artifact.",
+      "matchManagers": [
+        "github-actions"
+      ],
+      "semanticCommitType": "ci"
+    }
   ]
 }
