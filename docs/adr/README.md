@@ -16,3 +16,4 @@ date the decision was actually made.
 | [0004](0004-approval-testing.md) | Pin behaviour with golden (approval) tests | 2025-03-18 |
 | [0005](0005-run-entry-point-seam.md) | Expose the CLI as an in-process `Run(args, stdin, stdout, stderr) int` | 2026-08-02 |
 | [0006](0006-conventional-commits-and-releases.md) | Automate releases from Conventional Commits | 2026-08-06 |
+| [0007](0007-document-classification.md) | How kir classifies each document (workload / image-less / unprocessable) | 2026-08-08 |

@@ -38,14 +38,21 @@ func TestKind(t *testing.T) {
 	}
 }
 
-func TestError(t *testing.T) {
+// A non-workload kind (Service) is skipped: no images, no error, exit 0.
+func TestSkipsNonWorkloads(t *testing.T) {
 	t.Run("Service", func(t *testing.T) {
-		verify(t, []string{"kir_test.TestError.Service.input.yaml"}, nil)
+		verify(t, []string{"kir_test.TestSkipsNonWorkloads.Service.input.yaml"}, nil)
 	})
 }
 
 func TestMultiple(t *testing.T) {
 	verify(t, []string{"kir_test.TestMultiple.input.yaml"}, nil)
+}
+
+// A file mixing supported workloads with a non-workload document yields the
+// workloads' images; the non-workload is skipped without discarding the rest.
+func TestMixed(t *testing.T) {
+	verify(t, []string{"kir_test.TestMixed.input.yaml"}, nil)
 }
 
 // TestCLI covers behaviour that only exists at the CLI boundary — stdin wiring,

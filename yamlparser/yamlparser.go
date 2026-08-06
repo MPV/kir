@@ -7,6 +7,7 @@ import (
 	"github.com/mpv/kir/k8s"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/client-go/kubernetes/scheme"
 )
@@ -18,6 +19,15 @@ func ProcessData(data []byte) ([]string, error) {
 	decode := serializer.NewCodecFactory(scheme.Scheme).UniversalDeserializer().Decode
 	obj, gvk, err := decode(data, nil, nil)
 	if err != nil {
+		// Kinds that aren't registered in the scheme (CRDs and other custom
+		// resources) are skipped rather than failing the whole stream. Some of
+		// them may embed a PodSpec we could inspect; surfacing those ("seen but
+		// not detected") is tracked in #75. For now they are skipped silently,
+		// like any other non-workload document — see
+		// docs/adr/0007-document-classification.md.
+		if runtime.IsNotRegisteredError(err) {
+			return nil, nil
+		}
 		return nil, err
 	}
 
@@ -49,7 +59,11 @@ func ProcessData(data []byte) ([]string, error) {
 		return images, nil
 	}
 
-	return nil, fmt.Errorf("unsupported kind %s", gvk.Kind)
+	// Any other kind (Service, ConfigMap, ...) is a valid object with no images
+	// to report, not an error; skip it silently so a single non-workload
+	// document does not discard images from the rest of the stream. See
+	// docs/adr/0007-document-classification.md.
+	return nil, nil
 }
 
 func processUnstructured(item unstructured.Unstructured) ([]string, error) {
@@ -65,5 +79,7 @@ func processUnstructured(item unstructured.Unstructured) ([]string, error) {
 		}
 		return images, nil
 	}
-	return nil, fmt.Errorf("error: unsupported kind %s in List", gvk.Kind)
+	// Non-workload items inside a List are skipped, mirroring how top-level
+	// non-workload documents are handled.
+	return nil, nil
 }
