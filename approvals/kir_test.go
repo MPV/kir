@@ -68,4 +68,8 @@ func TestCLI(t *testing.T) {
 	t.Run("Usage", func(t *testing.T) {
 		verify(t, nil, nil)
 	})
+
+	t.Run("Version", func(t *testing.T) {
+		verify(t, []string{"--version"}, nil)
+	})
 }

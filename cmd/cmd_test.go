@@ -19,6 +19,25 @@ spec:
     image: test-image
 `
 
+func TestRunVersion(t *testing.T) {
+	for _, arg := range []string{"--version", "-v"} {
+		t.Run(arg, func(t *testing.T) {
+			var stdout, stderr bytes.Buffer
+			code := Run([]string{arg}, nil, &stdout, &stderr)
+
+			if code != 0 {
+				t.Errorf("exit code = %d, want 0", code)
+			}
+			if got := stdout.String(); !strings.HasPrefix(got, "kir ") {
+				t.Errorf("stdout = %q, want prefix %q", got, "kir ")
+			}
+			if stderr.Len() != 0 {
+				t.Errorf("stderr = %q, want empty", stderr.String())
+			}
+		})
+	}
+}
+
 func TestRunFile(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "test.yaml")
