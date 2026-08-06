@@ -35,18 +35,25 @@ func ProcessData(data []byte) ([]string, error) {
 	}
 
 	// Load the YAML data
-	dataV, err := yaml.Extract("", data)
+	dataAST, err := yaml.Extract("", data)
 	if err != nil {
 		return nil, fmt.Errorf("failed to extract YAML: %v", err)
 	}
 
-	dataValue := ctx.BuildFile(dataV)
-	if dataValue.Err() != nil {
-		return nil, fmt.Errorf("failed to build YAML data: %v", dataValue.Err())
+	// Build a Cue value from the extracted AST
+	dataV := ctx.BuildFile(dataAST)
+	if dataV.Err() != nil {
+		return nil, fmt.Errorf("failed to build Cue value from YAML: %v", dataV.Err())
 	}
 
-	// Unify the YAML value with the schema and validate
-	combined := podSpec.Unify(dataValue)
+	// Extract the spec section if it exists
+	specValue := dataV.LookupPath(cue.ParsePath("spec"))
+	if !specValue.Exists() {
+		return nil, fmt.Errorf("missing spec section in YAML")
+	}
+
+	// Unify the spec value with the schema and validate
+	combined := podSpec.Unify(specValue)
 	if err := combined.Validate(cue.Concrete(true)); err != nil {
 		return nil, fmt.Errorf("validation error: %v", err)
 	}
