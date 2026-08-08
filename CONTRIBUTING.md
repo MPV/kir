@@ -50,6 +50,23 @@ Versioning is driven by
 
 `kir --version` prints the embedded version, commit, and build date.
 
+### Verifying a release
+
+Binaries are signed keylessly; the signature is a Sigstore bundle
+(`checksums.txt.sigstore.json`) covering `checksums.txt`:
+
+```shell
+cosign verify-blob \
+  --bundle checksums.txt.sigstore.json \
+  --certificate-identity-regexp 'https://github.com/mpv/kir/.*' \
+  --certificate-oidc-issuer https://token.actions.githubusercontent.com \
+  checksums.txt
+```
+
+Then check a downloaded binary's archive against `checksums.txt`. The container
+image is signed too: `cosign verify ghcr.io/mpv/kir:X.Y.Z` (with the same
+identity flags).
+
 Dependency updates are managed by [Renovate](https://docs.renovatebot.com/),
 which follows the same commit conventions, so routine bumps flow through the same
 process.
