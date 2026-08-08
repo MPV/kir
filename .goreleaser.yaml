@@ -71,37 +71,28 @@ docker_manifests:
       - "ghcr.io/mpv/kir:{{ .Version }}-amd64"
       - "ghcr.io/mpv/kir:{{ .Version }}-arm64"
 
-# Signing is temporarily held so the release job can go green and start
-# publishing binaries + image + SBOMs + checksums. cosign >= 2.5.0 changed
-# sign-blob to the new bundle format, which broke the config below (the flags
-# are ignored and it aborts). Restore signing via one of:
-#   - pin cosign to 2.4.x and keep this config (see PR #70), or
-#   - roll forward: migrate to `--bundle` and un-pin cosign.
-# TODO(signing): re-enable once the approach is chosen and validated in CI.
-#
-# # Keyless (Sigstore) signing of the checksums file — covers every binary/archive.
-# signs:
-#   - cmd: cosign
-#     signature: "${artifact}.sig"
-#     certificate: "${artifact}.pem"
-#     args:
-#       - sign-blob
-#       - "--yes"
-#       - "--output-signature=${signature}"
-#       - "--output-certificate=${certificate}"
-#       - "${artifact}"
-#     artifacts: checksum
-#     output: true
-#
-# # Keyless (Sigstore) signing of the published multi-arch image manifests.
-# docker_signs:
-#   - cmd: cosign
-#     args:
-#       - sign
-#       - "--yes"
-#       - "${artifact}"
-#     artifacts: manifests
-#     output: true
+# Keyless (Sigstore) signing of the checksums file — one bundle (.sigstore.json)
+# covers every binary/archive. See CONTRIBUTING.md for how to verify a release.
+signs:
+  - cmd: cosign
+    signature: "${artifact}.sigstore.json"
+    args:
+      - sign-blob
+      - "--bundle=${signature}"
+      - "${artifact}"
+      - "--yes"
+    artifacts: checksum
+    output: true
+
+# Keyless (Sigstore) signing of the published multi-arch image manifests.
+docker_signs:
+  - cmd: cosign
+    args:
+      - sign
+      - "--yes"
+      - "${artifact}"
+    artifacts: manifests
+    output: true
 
 # release-please owns the changelog and the GitHub Release body; GoReleaser only
 # uploads artifacts to the release it already created for the tag.
