@@ -5,6 +5,7 @@ import (
 	"io"
 	"os"
 	"strconv"
+	"strings"
 	"testing"
 
 	approvals "github.com/approvals/go-approval-tests"
@@ -23,9 +24,21 @@ func verify(t *testing.T, args []string, stdin io.Reader) {
 	var stdout, stderr bytes.Buffer
 	code := cmd.Run(args, stdin, &stdout, &stderr)
 
-	approvals.VerifyString(t, stdout.String(), approvals.Options().ForFile().WithAdditionalInformation("stdout"))
-	approvals.VerifyString(t, stderr.String(), approvals.Options().ForFile().WithAdditionalInformation("stderr"))
-	approvals.VerifyString(t, strconv.Itoa(code), approvals.Options().ForFile().WithAdditionalInformation("exitcode"))
+	approvals.VerifyString(t, newlineTerminated(stdout.String()), approvals.Options().ForFile().WithAdditionalInformation("stdout"))
+	approvals.VerifyString(t, newlineTerminated(stderr.String()), approvals.Options().ForFile().WithAdditionalInformation("stderr"))
+	approvals.VerifyString(t, newlineTerminated(strconv.Itoa(code)), approvals.Options().ForFile().WithAdditionalInformation("exitcode"))
+}
+
+// newlineTerminated ends a non-empty string with a newline, mirroring what
+// go-approval-tests does to the received output from v1.6.0 on (empty output
+// stays empty there too). Normalising here rather than relying on the library
+// keeps the goldens byte-identical across that upgrade: every golden is a
+// POSIX text file, and the suite passes on either side of it.
+func newlineTerminated(s string) string {
+	if s == "" || strings.HasSuffix(s, "\n") {
+		return s
+	}
+	return s + "\n"
 }
 
 func TestKind(t *testing.T) {
