@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.4.1](https://github.com/MPV/kir/compare/v0.4.0...v0.4.1) (2026-08-09)
+
+
+### Bug Fixes
+
+* exit non-zero when a file cannot be processed ([#55](https://github.com/MPV/kir/issues/55)) ([655b764](https://github.com/MPV/kir/commit/655b764d587cccf7e3c2ef179e21141d44c007cb))
+
 ## [0.4.0](https://github.com/MPV/kir/compare/v0.3.1...v0.4.0) (2026-08-09)
 
 
