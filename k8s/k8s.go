@@ -1,13 +1,13 @@
 // Package k8s finds container images in Kubernetes manifests that have been
-// decoded into plain Go values. Where a kind keeps its PodSpec is configuration
-// (resources.yaml), not Go code.
+// decoded into plain Go values. Where a kind keeps its containers is
+// configuration (resources.yaml), not Go code.
 package k8s
 
 import (
 	_ "embed"
 	"fmt"
-	"strings"
 
+	"github.com/jmespath/go-jmespath"
 	"sigs.k8s.io/yaml"
 )
 
@@ -18,30 +18,44 @@ var defaultResources string
 // kir reports them.
 var containerFields = []string{"containers", "initContainers", "ephemeralContainers"}
 
-// Resource says where one kind keeps its PodSpecs.
+// Resource says where one kind keeps its images, as JMESPath expressions.
 type Resource struct {
 	Kind string `json:"kind"`
-	// PodSpecs are paths to PodSpec-shaped nodes.
+	// PodSpecs select PodSpec-shaped nodes, whose container fields are read.
 	PodSpecs []string `json:"podSpecs,omitempty"`
-	// Documents are paths to whole objects, each processed in its own right.
-	// A List uses this to reach its items.
+	// Containers select containers directly, for resources that hold bare
+	// containers rather than a PodSpec.
+	Containers []string `json:"containers,omitempty"`
+	// Documents select whole objects, each processed in its own right. A List
+	// uses this to reach its items.
 	Documents []string `json:"documents,omitempty"`
 }
 
-// Config maps kinds to the paths at which they hold PodSpecs.
+// Config maps kinds to where they keep their images.
 type Config struct {
 	Resources []Resource `json:"resources"`
 
-	byKind map[string]Resource
+	byKind map[string]expressions
 }
 
-// LoadConfig parses a resource configuration.
+// expressions holds one resource's compiled queries.
+type expressions struct {
+	podSpecs   []*jmespath.JMESPath
+	containers []*jmespath.JMESPath
+	documents  []*jmespath.JMESPath
+}
+
+// LoadConfig parses a resource configuration and compiles its expressions. A
+// malformed expression is an error here rather than a path that silently
+// matches nothing later.
 func LoadConfig(data []byte) (*Config, error) {
 	var config Config
 	if err := yaml.UnmarshalStrict(data, &config); err != nil {
 		return nil, fmt.Errorf("parsing config: %w", err)
 	}
-	config.index()
+	if err := config.compile(); err != nil {
+		return nil, err
+	}
 	return &config, nil
 }
 
@@ -49,8 +63,8 @@ func LoadConfig(data []byte) (*Config, error) {
 func DefaultConfig() *Config {
 	config, err := LoadConfig([]byte(defaultResources))
 	if err != nil {
-		// The embedded config is parsed in tests; a failure here is a bug.
-		panic(fmt.Sprintf("embedded config does not parse: %v", err))
+		// The embedded config is loaded in tests; a failure here is a bug.
+		panic(fmt.Sprintf("embedded config does not load: %v", err))
 	}
 	return config
 }
@@ -60,15 +74,42 @@ func DefaultConfig() *Config {
 // well as add a custom resource.
 func (c *Config) Merge(other *Config) *Config {
 	merged := &Config{Resources: append(append([]Resource{}, c.Resources...), other.Resources...)}
-	merged.index()
+	// Both halves compiled when they were loaded, so this cannot fail.
+	if err := merged.compile(); err != nil {
+		panic(fmt.Sprintf("merging already-compiled configs: %v", err))
+	}
 	return merged
 }
 
-func (c *Config) index() {
-	c.byKind = make(map[string]Resource, len(c.Resources))
+func (c *Config) compile() error {
+	c.byKind = make(map[string]expressions, len(c.Resources))
 	for _, resource := range c.Resources {
-		c.byKind[resource.Kind] = resource
+		var compiled expressions
+		var err error
+		if compiled.podSpecs, err = compileAll(resource.Kind, "podSpecs", resource.PodSpecs); err != nil {
+			return err
+		}
+		if compiled.containers, err = compileAll(resource.Kind, "containers", resource.Containers); err != nil {
+			return err
+		}
+		if compiled.documents, err = compileAll(resource.Kind, "documents", resource.Documents); err != nil {
+			return err
+		}
+		c.byKind[resource.Kind] = compiled
 	}
+	return nil
+}
+
+func compileAll(kind, field string, exprs []string) ([]*jmespath.JMESPath, error) {
+	compiled := make([]*jmespath.JMESPath, 0, len(exprs))
+	for _, expr := range exprs {
+		parsed, err := jmespath.Compile(expr)
+		if err != nil {
+			return nil, fmt.Errorf("%s.%s: %q: %w", kind, field, expr, err)
+		}
+		compiled = append(compiled, parsed)
+	}
+	return compiled, nil
 }
 
 // Kinds returns the configured kinds, for diagnostics.
@@ -90,13 +131,18 @@ func (c *Config) FindImages(doc map[string]any) []string {
 	}
 
 	var images []string
-	for _, path := range resource.PodSpecs {
-		for _, node := range resolve(doc, path) {
+	for _, expr := range resource.podSpecs {
+		for _, node := range search(expr, doc) {
 			images = append(images, podSpecImages(node)...)
 		}
 	}
-	for _, path := range resource.Documents {
-		for _, node := range resolve(doc, path) {
+	for _, expr := range resource.containers {
+		for _, node := range search(expr, doc) {
+			images = append(images, containerImages(node)...)
+		}
+	}
+	for _, expr := range resource.documents {
+		for _, node := range search(expr, doc) {
 			if nested, ok := node.(map[string]any); ok {
 				images = append(images, c.FindImages(nested)...)
 			}
@@ -105,37 +151,30 @@ func (c *Config) FindImages(doc map[string]any) []string {
 	return images
 }
 
-// resolve follows a dot-separated path from node, expanding lists at any
-// segment marked `[*]`. It returns every node the path reaches, which is none
-// when the path does not apply to this document.
-func resolve(node any, path string) []any {
-	nodes := []any{node}
-
-	for _, segment := range strings.Split(path, ".") {
-		expand := strings.HasSuffix(segment, "[*]")
-		segment = strings.TrimSuffix(segment, "[*]")
-
-		var next []any
-		for _, current := range nodes {
-			object, ok := current.(map[string]any)
-			if !ok {
-				continue
-			}
-			value, ok := object[segment]
-			if !ok {
-				continue
-			}
-			if !expand {
-				next = append(next, value)
-				continue
-			}
-			if list, ok := value.([]any); ok {
-				next = append(next, list...)
-			}
-		}
-		nodes = next
+// search runs one expression and returns the nodes it selected.
+//
+// A JMESPath projection yields one entry per input element, null where the
+// field is absent — `spec.templates[*].container` over templates that hold no
+// container, say — so nulls are dropped rather than counted as matches. An
+// expression selecting nothing returns no nodes, the normal case for a path
+// that does not apply to this document.
+func search(expr *jmespath.JMESPath, doc any) []any {
+	result, err := expr.Search(doc)
+	if err != nil || result == nil {
+		return nil
 	}
 
+	list, ok := result.([]any)
+	if !ok {
+		return []any{result}
+	}
+
+	nodes := make([]any, 0, len(list))
+	for _, node := range list {
+		if node != nil {
+			nodes = append(nodes, node)
+		}
+	}
 	return nodes
 }
 
@@ -150,19 +189,25 @@ func podSpecImages(node any) []string {
 
 	var images []string
 	for _, field := range containerFields {
-		containers, ok := podSpec[field].([]any)
-		if !ok {
-			continue
-		}
-		for _, entry := range containers {
-			container, ok := entry.(map[string]any)
-			if !ok {
-				continue
-			}
-			if image, ok := container["image"].(string); ok && image != "" {
-				images = append(images, image)
-			}
-		}
+		images = append(images, containerImages(podSpec[field])...)
 	}
 	return images
+}
+
+// containerImages reads the image of a container, or of every container in a
+// list of them.
+func containerImages(node any) []string {
+	switch n := node.(type) {
+	case []any:
+		var images []string
+		for _, item := range n {
+			images = append(images, containerImages(item)...)
+		}
+		return images
+	case map[string]any:
+		if image, ok := n["image"].(string); ok && image != "" {
+			return []string{image}
+		}
+	}
+	return nil
 }

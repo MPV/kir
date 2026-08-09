@@ -1,17 +1,21 @@
-# Where each kind keeps its PodSpec.
+# Where each kind keeps its images.
 #
-# This is the whole of kir's knowledge about Kubernetes: a kind, and the paths
-# at which it holds a PodSpec. Nothing is inferred — a kind absent from this
-# file yields no images.
+# This is the whole of kir's knowledge about Kubernetes: a kind, and JMESPath
+# expressions locating the images inside it. Nothing is inferred — a kind absent
+# from this file yields no images.
 #
-# Paths are dot-separated field names. A `[*]` suffix expands a list, applying
-# the rest of the path to every element.
+#   podSpecs    select PodSpec-shaped nodes; their containers, initContainers
+#               and ephemeralContainers are read.
+#   containers  select containers directly, for resources holding bare
+#               containers rather than a PodSpec.
+#   documents   select whole objects, each processed in its own right, which is
+#               how a List is unwrapped.
 #
-# `documents` names paths holding whole objects rather than PodSpecs; each match
-# is processed as a document in its own right, which is how a List is unwrapped.
+# Expressions are compiled when the file loads, so a malformed one is an error
+# rather than a path that silently matches nothing.
 #
 # Add your own with --config; entries are merged over these, so naming a kind
-# listed here replaces its paths.
+# listed here replaces its expressions.
 resources:
   - kind: Pod
     podSpecs: [spec]

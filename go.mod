@@ -5,6 +5,7 @@ go 1.26.0
 require (
 	github.com/approvals/go-approval-tests v1.14.0
 	github.com/distribution/reference v0.6.0
+	github.com/jmespath/go-jmespath v0.4.0
 	k8s.io/apimachinery v0.36.3
 	sigs.k8s.io/yaml v1.6.0
 )

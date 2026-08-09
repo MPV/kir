@@ -79,6 +79,17 @@ func TestCustomResource(t *testing.T) {
 	t.Run("Configured", func(t *testing.T) {
 		verify(t, []string{"--config", "kir_test.TestCustomResource.config.yaml", input}, nil)
 	})
+
+	// An Argo Workflow holds bare containers in a list of templates, each of
+	// which has a container, a script, or neither. One JMESPath expression
+	// covers it — select both shapes across the list, flatten, and templates
+	// with neither drop out — which a plain field path could not express.
+	t.Run("Workflow", func(t *testing.T) {
+		verify(t, []string{
+			"--config", "kir_test.TestCustomResource.Workflow.config.yaml",
+			"kir_test.TestCustomResource.Workflow.input.yaml",
+		}, nil)
+	})
 }
 
 func TestMultiple(t *testing.T) {
