@@ -1,0 +1,9 @@
+apiVersion: platform.example.com/v1
+kind: ManagedService
+metadata:
+  name: checkout
+spec:
+  containers:
+  - name: app
+    image: checkout:2.0.0
+    sidecarPolicy: Always
