@@ -12,6 +12,14 @@ gofmt -l .   # should print nothing
 CI runs `gofmt`, `go vet`, `go mod tidy` verification, and `go test -race`, so
 run them locally before opening a pull request.
 
+## Architecture decisions
+
+Design decisions are recorded as ADRs in [`docs/adr/`](docs/adr/). Read them
+before changing how `kir` is structured or behaves — they explain why the
+current design is the way it is. If a change revisits a decision, update or
+supersede the relevant ADR in the same pull request; add a new ADR for a new
+decision. This applies to human and AI contributors alike.
+
 ## Commit messages
 
 This project uses [Conventional Commits](https://www.conventionalcommits.org).
