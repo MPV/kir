@@ -70,10 +70,35 @@ A manifest stream usually mixes workloads with other objects. `kir` handles each
 
 | Document | Result |
 | --- | --- |
-| A workload — `Pod`, `Deployment`, `DaemonSet`, `ReplicaSet`, `StatefulSet`, `Job`, `CronJob` | its images are printed to stdout |
+| A configured kind — `Pod`, `Deployment`, `DaemonSet`, `ReplicaSet`, `ReplicationController`, `PodTemplate`, `StatefulSet`, `Job`, `CronJob`, `List` | its images are printed to stdout |
 | A valid object with no images — `Service`, `ConfigMap`, `Secret`, … | skipped silently (exit 0) |
 | Malformed or unreadable input | reported on stderr, non-zero exit |
 | A workload whose image value isn't a valid image reference | that image is reported on stderr with a non-zero exit; the document's other images are still printed |
-| An unrecognized custom resource (CRD) | skipped for now — see [#75](https://github.com/MPV/kir/issues/75) |
+| A custom resource kir has not been told about | skipped silently (exit 0) — describe it with `--config` |
 
 So stdout carries only images and stderr stays quiet for normal input. See [ADR 0007](docs/adr/0007-document-classification.md) for the rationale.
+
+### Teaching `kir` a custom resource
+
+Which kinds hold images, and where, is configuration rather than Go code — see [`k8s/resources.yaml`](k8s/resources.yaml). Locations are [JMESPath](https://jmespath.org) expressions. Point `--config` at your own file to describe a custom resource; entries are merged over the built-in ones, keyed by kind:
+
+```yaml
+# rollouts.yaml
+resources:
+  - kind: Rollout
+    podSpecs: [spec.template.spec]
+```
+
+```shell
+$ kir --config rollouts.yaml manifests/
+```
+
+Use `containers` for a resource that holds bare containers instead of a `PodSpec`. An Argo `Workflow` keeps a list of templates, each holding a container, a script, or neither — one expression covers all of it:
+
+```yaml
+resources:
+  - kind: Workflow
+    containers: ["spec.templates[*].[container, script][]"]
+```
+
+Expressions are compiled when the file loads, so a typo is reported then rather than silently matching nothing.

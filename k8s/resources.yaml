@@ -1,0 +1,44 @@
+# Where each kind keeps its PodSpec.
+#
+# This is the whole of kir's knowledge about Kubernetes: a kind, and the paths
+# at which it holds a PodSpec. Nothing is inferred — a kind absent from this
+# file yields no images.
+#
+# Paths are dot-separated field names. A `[*]` suffix expands a list, applying
+# the rest of the path to every element.
+#
+# `documents` names paths holding whole objects rather than PodSpecs; each match
+# is processed as a document in its own right, which is how a List is unwrapped.
+#
+# Add your own with --config; entries are merged over these, so naming a kind
+# listed here replaces its paths.
+resources:
+  - kind: Pod
+    podSpecs: [spec]
+
+  - kind: PodTemplate
+    podSpecs: [template.spec]
+
+  - kind: ReplicationController
+    podSpecs: [spec.template.spec]
+
+  - kind: Deployment
+    podSpecs: [spec.template.spec]
+
+  - kind: DaemonSet
+    podSpecs: [spec.template.spec]
+
+  - kind: ReplicaSet
+    podSpecs: [spec.template.spec]
+
+  - kind: StatefulSet
+    podSpecs: [spec.template.spec]
+
+  - kind: Job
+    podSpecs: [spec.template.spec]
+
+  - kind: CronJob
+    podSpecs: [spec.jobTemplate.spec.template.spec]
+
+  - kind: List
+    documents: ["items[*]"]
