@@ -32,10 +32,18 @@ readable without the scheme.
 ## Consequences
 
 This is the cheapest option by every mechanical measure, because the lookup
-never has to *decide* anything: 151 ms → 107 ms over 1000 documents (faster than
-today, having dropped typed decoding), a 3.9 MB binary against today's 28.9 MB,
-and a dependency list that goes from 99 `go.sum` lines to 22 — both
-`k8s.io/client-go` and `k8s.io/api` fall away, leaving `sigs.k8s.io/yaml`.
+never has to *decide* anything: 152 ms → 105 ms over 1000 documents (faster than
+today, having dropped typed decoding), a 3.7 MB binary against today's 27.6 MB,
+and a dependency list that goes from 99 `go.sum` lines to 26 — both
+`k8s.io/client-go` and `k8s.io/api` fall away, leaving `sigs.k8s.io/yaml` and
+`k8s.io/apimachinery` for the YAML reader.
+
+Paths are resolved by ~25 lines of Go: dot-separated segments, with a `[*]`
+suffix expanding a list. Deliberately not JMESPath or JSONPath — a query
+language would cost a dependency and invite expressions this has no use for.
+The syntax covers every built-in kind and the custom resources seen so far; a
+resource that needed selection rather than navigation would be the reason to
+revisit it.
 
 Precision is exact by construction. A path either matches or it does not, so
 there are no false positives to guard against and no schema to keep in step with
