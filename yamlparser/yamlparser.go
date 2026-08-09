@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"slices"
 
 	"github.com/mpv/kir/k8s"
 	corev1 "k8s.io/api/core/v1"
@@ -15,8 +14,6 @@ import (
 	utilyaml "k8s.io/apimachinery/pkg/util/yaml"
 	"k8s.io/client-go/kubernetes/scheme"
 )
-
-var supportedKinds = []string{"Pod", "Deployment", "DaemonSet", "ReplicaSet", "StatefulSet", "Job", "CronJob"}
 
 // ProcessReader reads a (possibly multi-document) YAML stream and returns the
 // container images of every supported workload it contains. Documents are
@@ -107,20 +104,14 @@ func ProcessData(data []byte) ([]string, error) {
 	return nil, nil
 }
 
+// processUnstructured handles one item of a List by feeding it back through
+// ProcessData, which already skips non-workload and unregistered kinds. There
+// is no kind allow-list to consult: whether an item yields images is decided by
+// whether its decoded object contains a PodSpec.
 func processUnstructured(item unstructured.Unstructured) ([]string, error) {
 	itemData, err := item.MarshalJSON()
 	if err != nil {
 		return nil, fmt.Errorf("error marshaling item: %v", err)
 	}
-	gvk := item.GroupVersionKind()
-	if slices.Contains(supportedKinds, gvk.Kind) {
-		images, err := ProcessData(itemData)
-		if err != nil {
-			return nil, fmt.Errorf("error processing data: %v", err)
-		}
-		return images, nil
-	}
-	// Non-workload items inside a List are skipped, mirroring how top-level
-	// non-workload documents are handled.
-	return nil, nil
+	return ProcessData(itemData)
 }

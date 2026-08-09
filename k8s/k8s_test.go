@@ -273,3 +273,44 @@ func TestGetContainersFromObject(t *testing.T) {
 		})
 	}
 }
+
+// FindPodSpecs is the discovery primitive: it matches on type, so a kind is
+// understood without being named anywhere. These are kinds the previous
+// hand-written type switch did not cover.
+func TestFindPodSpecsUnlistedKinds(t *testing.T) {
+	template := corev1.PodTemplateSpec{
+		Spec: corev1.PodSpec{
+			Containers: []corev1.Container{{Name: "c", Image: "image1"}},
+		},
+	}
+
+	tests := []struct {
+		name string
+		obj  any
+	}{
+		{"PodTemplate", &corev1.PodTemplate{Template: template}},
+		{"ReplicationController", &corev1.ReplicationController{
+			Spec: corev1.ReplicationControllerSpec{Template: &template},
+		}},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			specs := FindPodSpecs(tt.obj)
+			if len(specs) != 1 {
+				t.Fatalf("expected 1 PodSpec, got %d", len(specs))
+			}
+			if got := specs[0].Containers[0].Image; got != "image1" {
+				t.Errorf("expected image %q, got %q", "image1", got)
+			}
+		})
+	}
+}
+
+// An object with no PodSpec anywhere in it yields nothing rather than a false
+// positive — Service has a Spec, but not a PodSpec.
+func TestFindPodSpecsNone(t *testing.T) {
+	if specs := FindPodSpecs(&corev1.Service{}); len(specs) != 0 {
+		t.Errorf("expected no PodSpecs, got %d", len(specs))
+	}
+}

@@ -42,7 +42,10 @@ func newlineTerminated(s string) string {
 }
 
 func TestKind(t *testing.T) {
-	kinds := []string{"Pod", "CronJob", "DaemonSet", "Deployment", "Job", "ReplicaSet", "StatefulSet"}
+	// PodTemplate and ReplicationController are built-in kinds that carry a
+	// PodSpec but were missing from the previous hand-written type switch; they
+	// are understood now because discovery matches on type, not on kind.
+	kinds := []string{"Pod", "CronJob", "DaemonSet", "Deployment", "Job", "PodTemplate", "ReplicaSet", "ReplicationController", "StatefulSet"}
 
 	for _, kind := range kinds {
 		t.Run(kind, func(t *testing.T) {
