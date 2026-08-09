@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.4.2](https://github.com/MPV/kir/compare/v0.4.1...v0.4.2) (2026-08-09)
+
+
+### Bug Fixes
+
+* split YAML documents with the Kubernetes YAML reader ([d487e61](https://github.com/MPV/kir/commit/d487e61ef2f9227aa5c9a05c83a2401a6d4994e2))
+
 ## [0.4.1](https://github.com/MPV/kir/compare/v0.4.0...v0.4.1) (2026-08-09)
 
 
