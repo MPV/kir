@@ -9,11 +9,21 @@
   "semanticCommits": "enabled",
   "packageRules": [
     {
-      "description": "CI-only bumps (GitHub Actions) use a non-releasing type so they don't cut a release; go modules and the Docker base image stay fix -> patch since they change the shipped artifact.",
+      "description": "GitHub Actions are CI tooling and never reach the shipped binary or image, so bump them with a non-releasing type.",
       "matchManagers": [
         "github-actions"
       ],
       "semanticCommitType": "ci"
+    },
+    {
+      "description": "go-approval-tests is imported only from _test.go files, so a bump cannot change the shipped binary. go.mod has no test-only dependency type, so Renovate would otherwise default it to fix(deps) and cut a user-facing patch release.",
+      "matchManagers": [
+        "gomod"
+      ],
+      "matchPackageNames": [
+        "github.com/approvals/go-approval-tests"
+      ],
+      "semanticCommitType": "chore"
     }
   ]
 }
