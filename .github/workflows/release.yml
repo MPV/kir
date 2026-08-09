@@ -39,6 +39,7 @@ jobs:
       contents: write # upload release assets
       packages: write # push image to GHCR
       id-token: write # cosign keyless signing
+      attestations: write # record build provenance
     steps:
       - name: Checkout ${{ github.repository }}
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -77,3 +78,13 @@ jobs:
           args: release --clean
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # The cosign signature over checksums.txt establishes who published a
+      # release; provenance establishes how it was built — which workflow, from
+      # which commit, on which runner. Subjects are read from checksums.txt so
+      # the attestation covers exactly the artifacts the signature already
+      # covers, and cannot drift from them.
+      - name: Attest build provenance for the release artifacts
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-checksums: dist/checksums.txt
