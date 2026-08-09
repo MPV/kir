@@ -8,6 +8,12 @@ on:
     branches:
       - master
 
+# This workflow only reads the checkout — every write belongs to release.yml,
+# which declares its own scopes per job. Stating it here stops the token from
+# inheriting whatever the repository default happens to be.
+permissions:
+  contents: read
+
 jobs:
   test:
     name: Test
