@@ -55,6 +55,16 @@ func TestMixed(t *testing.T) {
 	verify(t, []string{"kir_test.TestMixed.input.yaml"}, nil)
 }
 
+// A List — the envelope `kubectl get ... -o yaml` wraps multiple objects in —
+// is unwrapped and each item processed on its own. The fixture holds the same
+// three objects as TestMixed, so the goldens pin that the List envelope and a
+// multi-document file yield identical images: workload items contribute theirs,
+// and a non-workload item is skipped without discarding the items around it.
+// Nothing else in the suite exercises the List branch or its item handling.
+func TestList(t *testing.T) {
+	verify(t, []string{"kir_test.TestList.input.yaml"}, nil)
+}
+
 // TestCLI covers behaviour that only exists at the CLI boundary — stdin wiring,
 // argument resolution, and no-args usage — which no file-argument scenario
 // above reaches.
