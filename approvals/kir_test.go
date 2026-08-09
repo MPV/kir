@@ -65,6 +65,15 @@ func TestList(t *testing.T) {
 	verify(t, []string{"kir_test.TestList.input.yaml"}, nil)
 }
 
+// A file that cannot be parsed is reported on stderr and makes kir exit
+// non-zero (rather than reporting success), pinning that contract through the
+// real CLI seam.
+func TestFailure(t *testing.T) {
+	t.Run("BadYAML", func(t *testing.T) {
+		verify(t, []string{"kir_test.TestFailure.BadYAML.input.yaml"}, nil)
+	})
+}
+
 // TestCLI covers behaviour that only exists at the CLI boundary — stdin wiring,
 // argument resolution, and no-args usage — which no file-argument scenario
 // above reaches.
