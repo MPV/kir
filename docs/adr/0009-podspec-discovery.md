@@ -33,12 +33,12 @@ items are just more nodes, so the kind allow-list and the unstructured item
 handling both go.
 
 Dropping typed decoding drops `k8s.io/client-go` entirely: the binary goes from
-28.9 MB to 12.8 MB. `k8s.io/api` stays, as the schema.
+27.6 MB to 12.2 MB. `k8s.io/api` stays, as the schema.
 
 The costs, and they are real:
 
-- **Slower**, since every candidate node is decode-tested: 169 ms → 203 ms over
-  1000 documents (~34 µs per document). Acceptable for a tool that shells out to
+- **Slower**, since every candidate node is decode-tested: 152 ms → 211 ms over
+  1000 documents (~59 µs per document). Acceptable for a tool that shells out to
   an image scanner afterwards.
 - **Precision now rests on the strict decode.** A field named `containers`
   holding anything else is rejected, and there is a golden fixture
