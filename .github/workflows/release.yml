@@ -93,3 +93,38 @@ jobs:
         uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
         with:
           subject-checksums: dist/checksums.txt
+
+      # GoReleaser's `sboms` block cannot cover an image — its `artifacts`
+      # field accepts source, package, archive, binary, any or none, with no
+      # image target — so the released image gets its SBOM here instead.
+      #
+      # The attestation is attached by digest, read back from the registry
+      # rather than assumed from the tag, so it is bound to the exact manifest
+      # GoReleaser just pushed.
+      - name: Attest an SBOM for the published image
+        env:
+          IMAGE_REPO: mpv/kir
+          TAG_NAME: ${{ needs.release-please.outputs.tag_name }}
+        run: |
+          set -euo pipefail
+          version="${TAG_NAME#v}"
+
+          token="$(curl -fsSL \
+            "https://ghcr.io/token?service=ghcr.io&scope=repository:${IMAGE_REPO}:pull" \
+            | jq -r .token)"
+          digest="$(curl -fsSL -o /dev/null -D- \
+            -H "Authorization: Bearer ${token}" \
+            -H "Accept: application/vnd.oci.image.index.v1+json" \
+            "https://ghcr.io/v2/${IMAGE_REPO}/manifests/${version}" \
+            | awk -F': ' 'tolower($1) == "docker-content-digest" { gsub(/\r/, ""); print $2 }')"
+
+          if [ -z "${digest}" ]; then
+            echo "could not resolve a digest for ghcr.io/${IMAGE_REPO}:${version}" >&2
+            exit 1
+          fi
+          echo "attesting SBOM for ghcr.io/${IMAGE_REPO}@${digest}"
+
+          syft "ghcr.io/${IMAGE_REPO}:${version}" -o spdx-json > sbom.spdx.json
+          cosign attest --yes --type spdx \
+            --predicate sbom.spdx.json \
+            "ghcr.io/${IMAGE_REPO}@${digest}"
