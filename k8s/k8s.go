@@ -4,17 +4,32 @@
 package k8s
 
 import (
-	_ "embed"
+	"embed"
+	"encoding/json"
 	"fmt"
+	"io/fs"
 	"maps"
+	"path"
 	"slices"
 
 	"cuelang.org/go/cue"
 	"cuelang.org/go/cue/cuecontext"
+	"cuelang.org/go/cue/load"
+	cuejson "cuelang.org/go/encoding/json"
 )
 
-//go:embed podspec.cue
-var defaultSchema string
+// schemaFS holds the schema kir matches against: podspec.cue, and the CUE
+// definitions generated from k8s.io/api by `cue get go` that it imports.
+//
+//go:embed all:cue.mod podspec.cue
+var schemaFS embed.FS
+
+// schemaRoot is where the embedded CUE module is mounted for the loader. The
+// files never touch disk; the path only has to be absolute and consistent.
+const schemaRoot = "/kir"
+
+// schemaFile is the unit a user schema replaces.
+const schemaFile = "podspec.cue"
 
 // containerFields are the PodSpec fields that carry images, listed in the order
 // kir reports them, paired with the schema definition each is matched against.
@@ -36,12 +51,26 @@ type Matcher struct {
 	definitions map[string]cue.Value
 }
 
-// NewMatcher compiles a CUE schema. The schema must define #Containers and
-// #EphemeralContainers; see podspec.cue.
+// NewMatcher compiles a CUE schema. An empty schema uses the embedded
+// podspec.cue; otherwise it stands in for that file, inside the same module, so
+// a user schema can import the generated Kubernetes definitions too. The schema
+// must define #Containers and #EphemeralContainers.
 func NewMatcher(schema string) (*Matcher, error) {
-	ctx := cuecontext.New()
+	overlay, err := schemaOverlay(schema)
+	if err != nil {
+		return nil, err
+	}
 
-	value := ctx.CompileString(schema)
+	instances := load.Instances([]string{"."}, &load.Config{Dir: schemaRoot, Overlay: overlay})
+	if len(instances) != 1 {
+		return nil, fmt.Errorf("loading schema: expected 1 instance, got %d", len(instances))
+	}
+	if err := instances[0].Err; err != nil {
+		return nil, fmt.Errorf("loading schema: %w", err)
+	}
+
+	ctx := cuecontext.New()
+	value := ctx.BuildInstance(instances[0])
 	if err := value.Err(); err != nil {
 		return nil, fmt.Errorf("compiling schema: %w", err)
 	}
@@ -52,15 +81,43 @@ func NewMatcher(schema string) (*Matcher, error) {
 		if err := definition.Err(); err != nil {
 			return nil, fmt.Errorf("schema is missing %s: %w", name, err)
 		}
+		// Deliberately not .Eval()'d: pre-evaluating these is ~7x faster, but
+		// it discards the closedness that makes a definition reject unknown
+		// fields, and every lookalike would start matching.
 		definitions[name] = definition
 	}
 
 	return &Matcher{ctx: ctx, definitions: definitions}, nil
 }
 
+// schemaOverlay mounts the embedded CUE module for the loader, substituting a
+// caller-supplied schema for podspec.cue when one is given.
+func schemaOverlay(schema string) (map[string]load.Source, error) {
+	overlay := map[string]load.Source{}
+	err := fs.WalkDir(schemaFS, ".", func(name string, entry fs.DirEntry, err error) error {
+		if err != nil || entry.IsDir() {
+			return err
+		}
+		data, err := schemaFS.ReadFile(name)
+		if err != nil {
+			return err
+		}
+		overlay[path.Join(schemaRoot, name)] = load.FromBytes(data)
+		return nil
+	})
+	if err != nil {
+		return nil, fmt.Errorf("reading embedded schema: %w", err)
+	}
+
+	if schema != "" {
+		overlay[path.Join(schemaRoot, schemaFile)] = load.FromString(schema)
+	}
+	return overlay, nil
+}
+
 // DefaultMatcher returns a Matcher over the embedded schema.
 func DefaultMatcher() *Matcher {
-	matcher, err := NewMatcher(defaultSchema)
+	matcher, err := NewMatcher("")
 	if err != nil {
 		// The embedded schema is compiled in tests; a failure here is a bug.
 		panic(fmt.Sprintf("embedded schema does not compile: %v", err))
@@ -131,8 +188,22 @@ func (m *Matcher) podSpecImages(node map[string]any) ([]string, bool) {
 }
 
 // unifies reports whether value satisfies the named schema definition.
+//
+// The candidate goes to CUE as JSON rather than through ctx.Encode. The
+// manifest was decoded YAML-to-JSON-to-Go, which leaves every number a float64,
+// and encoding that directly would offer CUE 8E+1 where the Kubernetes schema
+// says int32 — every container with a port would fail to match. Round-tripping
+// through JSON keeps whole numbers whole.
 func (m *Matcher) unifies(definition string, value any) bool {
-	encoded := m.ctx.Encode(value)
+	data, err := json.Marshal(value)
+	if err != nil {
+		return false
+	}
+	expr, err := cuejson.Extract("", data)
+	if err != nil {
+		return false
+	}
+	encoded := m.ctx.BuildExpr(expr)
 	if encoded.Err() != nil {
 		return false
 	}

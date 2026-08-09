@@ -10,7 +10,7 @@ import (
 // matcher compiles the embedded CUE schema once for the tests.
 func matcher(t *testing.T) *Matcher {
 	t.Helper()
-	m, err := NewMatcher(defaultSchema)
+	m, err := NewMatcher("")
 	if err != nil {
 		t.Fatalf("compiling embedded schema: %v", err)
 	}
@@ -256,5 +256,26 @@ items:
 		if got := m.FindImages(doc); !slices.Equal(got, want) {
 			t.Fatalf("FindImages() = %v, want %v — order is not stable", got, want)
 		}
+	}
+}
+
+// Numbers must reach CUE as integers. A manifest is decoded YAML-to-JSON-to-Go,
+// which leaves every number a float64; offering that to a schema saying int32
+// rejects every container that declares a port — most real ones.
+func TestFindImagesIntegerFields(t *testing.T) {
+	manifest := `
+kind: Pod
+spec:
+  containers:
+  - name: app
+    image: app:1
+    ports:
+    - containerPort: 80
+      name: web
+`
+
+	want := []string{"app:1"}
+	if got := matcher(t).FindImages(decode(t, manifest)); !slices.Equal(got, want) {
+		t.Errorf("FindImages() = %v, want %v", got, want)
 	}
 }
