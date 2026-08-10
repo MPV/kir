@@ -95,6 +95,42 @@ func TestRunFileFailure(t *testing.T) {
 	}
 }
 
+// Which values are unreportable is imageref's business; this pins the CLI
+// contract around them. The hostile bytes are written here rather than in an
+// approvals fixture, which tooling would normalise (see AGENTS.md).
+const hostileImageManifest = `
+apiVersion: v1
+kind: Pod
+metadata:
+  name: hostile
+spec:
+  containers:
+  - name: reportable
+    image: registry.k8s.io/nginx-slim:0.8
+  - name: forges-a-second-entry
+    image: "evil\nsecond-line"
+  - name: repaints-the-terminal
+    image: "nginx:1.0\x1b[2K\rregistry.io/trusted:safe"
+`
+
+func TestRunRejectsUnreportableImages(t *testing.T) {
+	var stdout, stderr bytes.Buffer
+	code := Run([]string{"-"}, strings.NewReader(hostileImageManifest), &stdout, &stderr)
+
+	if code != 1 {
+		t.Errorf("exit code = %d, want 1", code)
+	}
+	if got, want := stdout.String(), "registry.k8s.io/nginx-slim:0.8\n"; got != want {
+		t.Errorf("stdout = %q, want only the reportable image %q", got, want)
+	}
+	if got, want := strings.Count(stderr.String(), "error:"), 2; got != want {
+		t.Errorf("stderr reported %d errors, want %d:\n%s", got, want, stderr.String())
+	}
+	if strings.ContainsRune(stderr.String(), '\x1b') {
+		t.Errorf("stderr contains a raw escape byte, want it quoted:\n%q", stderr.String())
+	}
+}
+
 func TestRunNoArgs(t *testing.T) {
 	var stdout, stderr bytes.Buffer
 	code := Run(nil, nil, &stdout, &stderr)

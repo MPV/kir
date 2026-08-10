@@ -73,6 +73,7 @@ A manifest stream usually mixes workloads with other objects. `kir` handles each
 | A workload — `Pod`, `Deployment`, `DaemonSet`, `ReplicaSet`, `StatefulSet`, `Job`, `CronJob` | its images are printed to stdout |
 | A valid object with no images — `Service`, `ConfigMap`, `Secret`, … | skipped silently (exit 0) |
 | Malformed or unreadable input | reported on stderr, non-zero exit |
+| A workload whose image value isn't a valid image reference | that image is reported on stderr with a non-zero exit; the document's other images are still printed |
 | An unrecognized custom resource (CRD) | skipped for now — see [#75](https://github.com/MPV/kir/issues/75) |
 
 So stdout carries only images and stderr stays quiet for normal input. See [ADR 0007](docs/adr/0007-document-classification.md) for the rationale.

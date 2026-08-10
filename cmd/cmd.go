@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/mpv/kir/fileutil"
+	"github.com/mpv/kir/imageref"
 	"github.com/mpv/kir/processor"
 )
 
@@ -45,7 +46,7 @@ func Run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 			}
 			images, err := processor.ProcessStdin(stdin)
 			failures := logErrors(logger, err)
-			printImages(stdout, images)
+			failures += printImages(stdout, logger, "stdin", images)
 			if failures > 0 {
 				return 1
 			}
@@ -68,7 +69,7 @@ func Run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 		// yielded images from the others, and dropping them would defeat the
 		// point of reporting the failure.
 		failures += logErrors(logger, err)
-		printImages(stdout, images)
+		failures += printImages(stdout, logger, filePath, images)
 	}
 	if failures > 0 {
 		return 1
@@ -96,8 +97,19 @@ func logErrors(logger *log.Logger, err error) int {
 	return 1
 }
 
-func printImages(w io.Writer, images []string) {
+// printImages writes every reportable image to w, reports the rest to logger,
+// and returns how many it rejected. An unreportable reference gets the same
+// treatment as a malformed document (ADR 0008): named on stderr, counted
+// against the exit code, and not allowed to discard the images beside it.
+func printImages(w io.Writer, logger *log.Logger, source string, images []string) int {
+	rejected := 0
 	for _, image := range images {
+		if err := imageref.Validate(image); err != nil {
+			logger.Printf("error: %s: %v", source, err)
+			rejected++
+			continue
+		}
 		fmt.Fprintln(w, image)
 	}
+	return rejected
 }
