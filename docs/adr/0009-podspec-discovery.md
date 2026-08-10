@@ -44,7 +44,7 @@ unique here is the **replaceable schema**, covered by `TestCustomSchema`.
 Reusing the generated types removes the fidelity objection to a hand-written
 CUE schema — there is nothing to drift. It replaces it with three sharper ones:
 
-- **Cost.** 149 ms → **2272 ms** over 1000 documents, ~15× today and ~11× option
+- **Cost.** 105 ms → **2163 ms** over 1000 documents, ~21× today and ~16× option
   B, which validates the same shapes using the same Kubernetes types as Go code.
   Unifying against the full closed `#Container` and its dependency graph is
   simply expensive.
