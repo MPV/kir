@@ -33,12 +33,12 @@ items are just more nodes, so the kind allow-list and the unstructured item
 handling both go.
 
 Dropping typed decoding drops `k8s.io/client-go` entirely: the binary goes from
-27.6 MB to 12.2 MB. `k8s.io/api` stays, as the schema.
+27.2 MB to 12.4 MB. `k8s.io/api` stays, as the schema.
 
 The costs, and they are real:
 
-- **Slower**, since every candidate node is decode-tested: 152 ms → 211 ms over
-  1000 documents (~59 µs per document). Acceptable for a tool that shells out to
+- **Slower**, since every candidate node is decode-tested: 105 ms → 133 ms over
+  1000 documents (~28 µs per document). Acceptable for a tool that shells out to
   an image scanner afterwards.
 - **Precision now rests on the strict decode.** A field named `containers`
   holding anything else is rejected, and there is a golden fixture
@@ -49,6 +49,8 @@ The costs, and they are real:
 - **Bound to the vendored `k8s.io/api`**: a container field newer than the
   vendored version fails the strict decode. Bumping the dependency is the fix,
   and a stale bump is now a correctness issue rather than only a hygiene one.
+  In practice the binding is loose — the v0.32.3 → v0.36.3 bump moved no
+  goldens and needed no code change — but it is the thing to watch.
 
 Alternatives considered: reflecting over the typed scheme (option A) keeps
 perfect precision but cannot see custom resources at all; a CUE schema (option
