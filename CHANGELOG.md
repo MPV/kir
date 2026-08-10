@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.4.4](https://github.com/MPV/kir/compare/v0.4.3...v0.4.4) (2026-08-10)
+
+
+### Bug Fixes
+
+* keep the images found around a document that fails ([7ceafd3](https://github.com/MPV/kir/commit/7ceafd3b10201d236ece0f1f8dd3882c7c378f5a))
+
 ## [0.4.3](https://github.com/MPV/kir/compare/v0.4.2...v0.4.3) (2026-08-10)
 
 
