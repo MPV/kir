@@ -37,39 +37,30 @@ checksum:
 sboms:
   - artifacts: archive
 
-dockers:
-  - image_templates:
-      - "ghcr.io/mpv/kir:{{ .Version }}-amd64"
-    use: buildx
-    goarch: amd64
+# One `docker buildx build --platform linux/amd64,linux/arm64 --push` produces
+# the multi-arch index directly, replacing the per-arch `dockers` entries and
+# the `docker_manifests` that stitched them together (both of which GoReleaser
+# is phasing out). Binaries are staged into the build context under
+# <platform>/<name>, which is why Dockerfile.goreleaser copies from
+# ${TARGETPLATFORM}.
+dockers_v2:
+  - images:
+      - "ghcr.io/mpv/kir"
+    tags:
+      - "{{ .Version }}"
+      - latest
+    platforms:
+      - linux/amd64
+      - linux/arm64
     dockerfile: Dockerfile.goreleaser
-    build_flag_templates:
-      - "--platform=linux/amd64"
-      - "--label=org.opencontainers.image.title={{ .ProjectName }}"
-      - "--label=org.opencontainers.image.version={{ .Version }}"
-      - "--label=org.opencontainers.image.revision={{ .FullCommit }}"
-      - "--label=org.opencontainers.image.source=https://github.com/mpv/kir"
-  - image_templates:
-      - "ghcr.io/mpv/kir:{{ .Version }}-arm64"
-    use: buildx
-    goarch: arm64
-    dockerfile: Dockerfile.goreleaser
-    build_flag_templates:
-      - "--platform=linux/arm64"
-      - "--label=org.opencontainers.image.title={{ .ProjectName }}"
-      - "--label=org.opencontainers.image.version={{ .Version }}"
-      - "--label=org.opencontainers.image.revision={{ .FullCommit }}"
-      - "--label=org.opencontainers.image.source=https://github.com/mpv/kir"
-
-docker_manifests:
-  - name_template: "ghcr.io/mpv/kir:{{ .Version }}"
-    image_templates:
-      - "ghcr.io/mpv/kir:{{ .Version }}-amd64"
-      - "ghcr.io/mpv/kir:{{ .Version }}-arm64"
-  - name_template: "ghcr.io/mpv/kir:latest"
-    image_templates:
-      - "ghcr.io/mpv/kir:{{ .Version }}-amd64"
-      - "ghcr.io/mpv/kir:{{ .Version }}-arm64"
+    # Adds a BuildKit SBOM attestation to the image index (--attest=type=sbom).
+    # This is GoReleaser's default; stated explicitly so it can't change under us.
+    sbom: true
+    labels:
+      org.opencontainers.image.title: "{{ .ProjectName }}"
+      org.opencontainers.image.version: "{{ .Version }}"
+      org.opencontainers.image.revision: "{{ .FullCommit }}"
+      org.opencontainers.image.source: "https://github.com/mpv/kir"
 
 # Keyless (Sigstore) signing of the checksums file — one bundle (.sigstore.json)
 # covers every binary/archive. See CONTRIBUTING.md for how to verify a release.
@@ -84,7 +75,9 @@ signs:
     artifacts: checksum
     output: true
 
-# Keyless (Sigstore) signing of the published multi-arch image manifests.
+# Keyless (Sigstore) signing of the published image index. `artifacts:
+# manifests` selects both docker_manifests and dockers_v2 artifacts, so this
+# still signs every pushed tag after the dockers_v2 migration.
 docker_signs:
   - cmd: cosign
     args:
