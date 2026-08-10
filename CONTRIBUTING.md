@@ -75,6 +75,34 @@ Then check a downloaded binary's archive against `checksums.txt`. The container
 image is signed too: `cosign verify ghcr.io/mpv/kir:X.Y.Z` (with the same
 identity flags).
 
+The image also carries its SBOM as a signed attestation. Verifying it checks the
+same keyless identity as the signature above, and additionally that the SBOM was
+produced by the release workflow rather than supplied by whoever handed you the
+image:
+
+```shell
+cosign verify-attestation \
+  --type spdxjson \
+  --certificate-identity-regexp 'https://github.com/mpv/kir/.*' \
+  --certificate-oidc-issuer https://token.actions.githubusercontent.com \
+  ghcr.io/mpv/kir:X.Y.Z
+```
+
+To read the SBOM itself, unwrap the in-toto payload from the verified
+attestation:
+
+```shell
+cosign verify-attestation \
+  --type spdxjson \
+  --certificate-identity-regexp 'https://github.com/mpv/kir/.*' \
+  --certificate-oidc-issuer https://token.actions.githubusercontent.com \
+  ghcr.io/mpv/kir:X.Y.Z \
+  | jq -r '.payload | @base64d | fromjson | .predicate' > kir.spdx.json
+```
+
+Release archives don't need this: their SBOMs are published as separate files
+alongside the checksums, so they can be read directly.
+
 Dependency updates are managed by [Renovate](https://docs.renovatebot.com/),
 which follows the same commit conventions, so routine bumps flow through the same
 process.

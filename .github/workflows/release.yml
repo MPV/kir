@@ -125,6 +125,9 @@ jobs:
           echo "attesting SBOM for ghcr.io/${IMAGE_REPO}@${digest}"
 
           syft "ghcr.io/${IMAGE_REPO}:${version}" -o spdx-json > sbom.spdx.json
-          cosign attest --yes --type spdx \
+          # spdxjson, not spdx: both carry the SPDX predicate type, but `spdx`
+          # embeds the document as an opaque string while `spdxjson` parses it,
+          # so consumers get a structured SBOM rather than JSON in a string.
+          cosign attest --yes --type spdxjson \
             --predicate sbom.spdx.json \
             "ghcr.io/${IMAGE_REPO}@${digest}"
