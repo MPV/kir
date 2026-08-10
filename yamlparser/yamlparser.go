@@ -2,6 +2,7 @@ package yamlparser
 
 import (
 	"bufio"
+	"errors"
 	"fmt"
 	"io"
 	"slices"
@@ -22,8 +23,16 @@ var supportedKinds = []string{"Pod", "Deployment", "DaemonSet", "ReplicaSet", "S
 // separated using the Kubernetes YAML reader, which correctly handles leading
 // and trailing "---" separators, separators followed by trailing whitespace,
 // CRLF line endings, and a final document without a trailing newline.
+//
+// A document that cannot be processed does not discard the stream. Its failure
+// is collected, the documents after it are still read, and whatever images were
+// found are returned alongside the joined errors. ADR 0008 has kir print every
+// image it finds and surface failures through the exit code; that has to hold
+// within a stream as well as between inputs, or one unparseable document in a
+// cluster dump costs every image around it.
 func ProcessReader(r io.Reader) ([]string, error) {
 	var images []string
+	var errs []error
 	reader := utilyaml.NewYAMLReader(bufio.NewReader(r))
 	for {
 		doc, err := reader.Read()
@@ -31,15 +40,19 @@ func ProcessReader(r io.Reader) ([]string, error) {
 			break
 		}
 		if err != nil {
-			return nil, fmt.Errorf("error reading YAML document: %v", err)
+			// The stream can no longer be split into documents, so there is
+			// nothing further to read — but what was already found still counts.
+			errs = append(errs, fmt.Errorf("error reading YAML document: %v", err))
+			break
 		}
 		imgs, err := ProcessData(doc)
 		if err != nil {
-			return nil, err
+			errs = append(errs, err)
+			continue
 		}
 		images = append(images, imgs...)
 	}
-	return images, nil
+	return images, errors.Join(errs...)
 }
 
 func ProcessData(data []byte) ([]string, error) {

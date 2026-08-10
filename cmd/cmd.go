@@ -44,11 +44,11 @@ func Run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 				stdin = strings.NewReader("")
 			}
 			images, err := processor.ProcessStdin(stdin)
-			if err != nil {
-				logger.Printf("error: %v", err)
+			failures := logErrors(logger, err)
+			printImages(stdout, images)
+			if failures > 0 {
 				return 1
 			}
-			printImages(stdout, images)
 			return 0
 		case "--version", "-v":
 			fmt.Fprintf(stdout, "kir %s (commit %s, built %s)\n", version, commit, date)
@@ -64,17 +64,36 @@ func Run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	failures := 0
 	for _, filePath := range files {
 		images, err := processor.ProcessFile(filePath)
-		if err != nil {
-			logger.Printf("error: %v", err)
-			failures++
-			continue
-		}
+		// Not `continue`: a file that failed on one document may still have
+		// yielded images from the others, and dropping them would defeat the
+		// point of reporting the failure.
+		failures += logErrors(logger, err)
 		printImages(stdout, images)
 	}
 	if failures > 0 {
 		return 1
 	}
 	return 0
+}
+
+// logErrors writes one "error:" line per failure and returns how many it wrote.
+//
+// A single input can fail on more than one document, and ProcessReader packs
+// those into one joined error. Unwrapping it here keeps stderr to one failure
+// per line, which is what anything reading that stream expects.
+func logErrors(logger *log.Logger, err error) int {
+	if err == nil {
+		return 0
+	}
+	if joined, ok := err.(interface{ Unwrap() []error }); ok {
+		count := 0
+		for _, e := range joined.Unwrap() {
+			count += logErrors(logger, e)
+		}
+		return count
+	}
+	logger.Printf("error: %v", err)
+	return 1
 }
 
 func printImages(w io.Writer, images []string) {

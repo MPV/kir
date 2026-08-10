@@ -1,6 +1,9 @@
 package yamlparser
 
 import (
+	"errors"
+	"slices"
+	"strings"
 	"testing"
 )
 
@@ -66,5 +69,47 @@ spec:
 		if img != expected[i] {
 			t.Errorf("expected image %q, got %q", expected[i], img)
 		}
+	}
+}
+
+// A document that cannot be processed must not discard the images found in the
+// documents around it. Before this was fixed, one unparseable document anywhere
+// in a stream returned no images at all — so a single bad object in a
+// `kubectl get -A -o yaml` dump silently cost every image in it.
+func TestProcessReaderKeepsImagesAroundABadDocument(t *testing.T) {
+	stream := strings.Join([]string{
+		"apiVersion: v1\nkind: Pod\nspec:\n  containers:\n  - {name: c, image: before-the-break}\n",
+		"apiVersion: v1\nkind: Pod\nspec:\n  containers:\n  - {name: c, image: nginx, ports: [8080}\n",
+		"apiVersion: v1\nkind: Pod\nspec:\n  containers:\n  - {name: c, image: after-the-break}\n",
+	}, "---\n")
+
+	images, err := ProcessReader(strings.NewReader(stream))
+
+	if err == nil {
+		t.Error("ProcessReader() error = nil, want the bad document reported")
+	}
+	want := []string{"before-the-break", "after-the-break"}
+	if !slices.Equal(images, want) {
+		t.Errorf("ProcessReader() images = %v, want %v", images, want)
+	}
+}
+
+// Every failure in a stream is reported, not just the first, so the exit code
+// and stderr account for all of them.
+func TestProcessReaderReportsEveryBadDocument(t *testing.T) {
+	bad := "apiVersion: v1\nkind: Pod\nspec:\n  containers:\n  - {name: c, image: nginx, ports: [8080}\n"
+	stream := strings.Join([]string{bad, bad}, "---\n")
+
+	images, err := ProcessReader(strings.NewReader(stream))
+
+	if len(images) != 0 {
+		t.Errorf("ProcessReader() images = %v, want none", images)
+	}
+	var joined interface{ Unwrap() []error }
+	if !errors.As(err, &joined) {
+		t.Fatalf("ProcessReader() error = %v, want a joined error covering both documents", err)
+	}
+	if got := len(joined.Unwrap()); got != 2 {
+		t.Errorf("ProcessReader() reported %d failures, want 2", got)
 	}
 }

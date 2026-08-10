@@ -85,6 +85,15 @@ func TestFailure(t *testing.T) {
 	t.Run("BadYAML", func(t *testing.T) {
 		verify(t, []string{"kir_test.TestFailure.BadYAML.input.yaml"}, nil)
 	})
+
+	// One unparseable document does not cost the images in the documents around
+	// it: the fixture's first and third workloads are still reported, the bad
+	// middle one is named on stderr, and the exit code is non-zero (ADR 0008).
+	// BadYAML above cannot pin this — its whole file is unparseable, so it
+	// passes whether or not partial results survive.
+	t.Run("PartialStream", func(t *testing.T) {
+		verify(t, []string{"kir_test.TestFailure.PartialStream.input.yaml"}, nil)
+	})
 }
 
 // TestCLI covers behaviour that only exists at the CLI boundary — stdin wiring,
