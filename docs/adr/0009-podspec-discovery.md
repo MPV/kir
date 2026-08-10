@@ -34,9 +34,9 @@ readable without the scheme.
 ## Consequences
 
 This is the cheapest option by every mechanical measure, because the lookup
-never has to *decide* anything: 152 ms → 111 ms over 1000 documents (faster than
-today, having dropped typed decoding), a 3.9 MB binary against today's 27.6 MB,
-and a dependency list that goes from 99 `go.sum` lines to 39 — both
+never has to *decide* anything: 105 ms → 76 ms over 1000 documents (faster than
+today, having dropped typed decoding), a 4.1 MB binary against today's 27.2 MB,
+and a dependency list that goes from 74 `go.sum` lines to 42 — both
 `k8s.io/client-go` and `k8s.io/api` fall away, leaving `sigs.k8s.io/yaml`,
 `k8s.io/apimachinery` for the YAML reader, and `go-jmespath`.
 
@@ -65,8 +65,8 @@ matches nothing all run (`TestLoadConfigRejectsBadExpression`), and JMESPath is
 a specified language users may already know from Kyverno or the AWS CLI, rather
 than a syntax peculiar to kir.
 
-The price is a dependency (13 `go.sum` lines, 0.2 MB of binary, 6 ms per 1000
-documents) and a larger surface: users can now write expressions that select
+The price is a dependency (13 `go.sum` lines, 0.2 MB of binary, and 1 ms per
+1000 documents — 75 ms to 76 ms) and a larger surface: users can now write expressions that select
 something which is not a container at all, and nothing here checks that claim.
 
 Precision is exact by construction. A path either matches or it does not, so
