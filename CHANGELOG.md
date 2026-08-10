@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.4.3](https://github.com/MPV/kir/compare/v0.4.2...v0.4.3) (2026-08-10)
+
+
+### Bug Fixes
+
+* **deps:** update kubernetes monorepo to v0.36.3 ([5b7bda0](https://github.com/MPV/kir/commit/5b7bda0e2ab16810fb4ea88f6873c5cec57c3cb4))
+
 ## [0.4.2](https://github.com/MPV/kir/compare/v0.4.1...v0.4.2) (2026-08-09)
 
 
