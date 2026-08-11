@@ -1,0 +1,48 @@
+# Where each kind keeps its images.
+#
+# This is the whole of kir's knowledge about Kubernetes: a kind, and JMESPath
+# expressions locating the images inside it. Nothing is inferred — a kind absent
+# from this file yields no images.
+#
+#   podSpecs    select PodSpec-shaped nodes; their containers, initContainers
+#               and ephemeralContainers are read.
+#   containers  select containers directly, for resources holding bare
+#               containers rather than a PodSpec.
+#   documents   select whole objects, each processed in its own right, which is
+#               how a List is unwrapped.
+#
+# Expressions are compiled when the file loads, so a malformed one is an error
+# rather than a path that silently matches nothing.
+#
+# Add your own with --config; entries are merged over these, so naming a kind
+# listed here replaces its expressions.
+resources:
+  - kind: Pod
+    podSpecs: [spec]
+
+  - kind: PodTemplate
+    podSpecs: [template.spec]
+
+  - kind: ReplicationController
+    podSpecs: [spec.template.spec]
+
+  - kind: Deployment
+    podSpecs: [spec.template.spec]
+
+  - kind: DaemonSet
+    podSpecs: [spec.template.spec]
+
+  - kind: ReplicaSet
+    podSpecs: [spec.template.spec]
+
+  - kind: StatefulSet
+    podSpecs: [spec.template.spec]
+
+  - kind: Job
+    podSpecs: [spec.template.spec]
+
+  - kind: CronJob
+    podSpecs: [spec.jobTemplate.spec.template.spec]
+
+  - kind: List
+    documents: ["items[*]"]

@@ -42,7 +42,9 @@ func newlineTerminated(s string) string {
 }
 
 func TestKind(t *testing.T) {
-	kinds := []string{"Pod", "CronJob", "DaemonSet", "Deployment", "Job", "ReplicaSet", "StatefulSet"}
+	// PodTemplate and ReplicationController are built-in kinds carrying a
+	// PodSpec that the previous fixed kind list omitted.
+	kinds := []string{"Pod", "CronJob", "DaemonSet", "Deployment", "Job", "PodTemplate", "ReplicaSet", "ReplicationController", "StatefulSet"}
 
 	for _, kind := range kinds {
 		t.Run(kind, func(t *testing.T) {
@@ -51,10 +53,40 @@ func TestKind(t *testing.T) {
 	}
 }
 
-// A non-workload kind (Service) is skipped: no images, no error, exit 0.
+// A non-workload document is skipped: no images, no error, exit 0. Service is
+// a built-in without a PodSpec; Lookalike is a custom resource with a field
+// named containers holding something that is not a container, which pins the
+// cost of matching on shape — a name alone must not be enough to match.
 func TestSkipsNonWorkloads(t *testing.T) {
-	t.Run("Service", func(t *testing.T) {
-		verify(t, []string{"kir_test.TestSkipsNonWorkloads.Service.input.yaml"}, nil)
+	for _, name := range []string{"Service", "Lookalike"} {
+		t.Run(name, func(t *testing.T) {
+			verify(t, []string{"kir_test.TestSkipsNonWorkloads." + name + ".input.yaml"}, nil)
+		})
+	}
+}
+
+// The two halves of how kir reads a custom resource.
+//
+// Rollout is inferred: it embeds a PodSpec, so the walk finds its images with
+// no configuration and nothing in kir naming that kind. Workflow has to be
+// described: its images sit in bare containers across a list of templates,
+// which is not a PodSpec and so has no shape to match — the case configuration
+// exists for. Both are pinned, because the pair is the whole argument for
+// having both mechanisms.
+func TestCustomResource(t *testing.T) {
+	t.Run("Inferred", func(t *testing.T) {
+		verify(t, []string{"kir_test.TestCustomResource.input.yaml"}, nil)
+	})
+
+	t.Run("WorkflowUndescribed", func(t *testing.T) {
+		verify(t, []string{"kir_test.TestCustomResource.Workflow.input.yaml"}, nil)
+	})
+
+	t.Run("WorkflowConfigured", func(t *testing.T) {
+		verify(t, []string{
+			"--config", "kir_test.TestCustomResource.Workflow.config.yaml",
+			"kir_test.TestCustomResource.Workflow.input.yaml",
+		}, nil)
 	})
 }
 

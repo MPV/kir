@@ -1,0 +1,7 @@
+# An Argo Workflow keeps images in a list of templates, and each template holds
+# either a container, a script, or neither (a dag, a suspend). One expression
+# covers it: select both shapes from every template, flatten, and the templates
+# that have neither drop out.
+resources:
+  - kind: Workflow
+    containers: ["spec.templates[*].[container, script][]"]

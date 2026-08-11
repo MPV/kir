@@ -1,0 +1,2 @@
+builder:1.2.0
+python:3.12

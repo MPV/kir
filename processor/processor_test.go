@@ -3,6 +3,8 @@ package processor
 import (
 	"os"
 	"testing"
+
+	"github.com/mpv/kir/k8s"
 )
 
 func TestProcessFile(t *testing.T) {
@@ -28,7 +30,7 @@ spec:
     image: another-image
 `)
 
-	images, err := ProcessFile(dir + "/test.yaml")
+	images, err := ProcessFile(k8s.DefaultConfig(), dir+"/test.yaml")
 	if err != nil {
 		t.Fatalf("ProcessFile() error = %v", err)
 	}
