@@ -4,10 +4,12 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"os"
 	"strings"
 
 	"github.com/mpv/kir/fileutil"
 	"github.com/mpv/kir/imageref"
+	"github.com/mpv/kir/k8s"
 	"github.com/mpv/kir/processor"
 )
 
@@ -34,7 +36,13 @@ func Run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	logger := log.New(stderr, "", 0)
 
 	if len(args) == 0 {
-		logger.Print("Usage: kir <file_path> [<file_path_2> ...] | kir - | kir --version")
+		logger.Print("Usage: kir [--config <file.yaml>] <file_path> [<file_path_2> ...] | kir - | kir --version")
+		return 1
+	}
+
+	args, config, err := configFlag(args)
+	if err != nil {
+		logger.Printf("error: %v", err)
 		return 1
 	}
 
@@ -44,7 +52,7 @@ func Run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 			if stdin == nil {
 				stdin = strings.NewReader("")
 			}
-			images, err := processor.ProcessStdin(stdin)
+			images, err := processor.ProcessStdin(config, stdin)
 			failures := logErrors(logger, err)
 			failures += printImages(stdout, logger, "stdin", images)
 			if failures > 0 {
@@ -64,7 +72,7 @@ func Run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	}
 	failures := 0
 	for _, filePath := range files {
-		images, err := processor.ProcessFile(filePath)
+		images, err := processor.ProcessFile(config, filePath)
 		// Not `continue`: a file that failed on one document may still have
 		// yielded images from the others, and dropping them would defeat the
 		// point of reporting the failure.
@@ -75,6 +83,30 @@ func Run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 		return 1
 	}
 	return 0
+}
+
+// configFlag consumes a leading `--config <file.yaml>` and returns the
+// remaining arguments alongside the configuration to use. The file is merged
+// over the built-in one, so a resource can be described — or a built-in
+// corrected — without rebuilding kir.
+func configFlag(args []string) ([]string, *k8s.Config, error) {
+	config := k8s.DefaultConfig()
+	if len(args) == 0 || args[0] != "--config" {
+		return args, config, nil
+	}
+	if len(args) < 2 {
+		return nil, nil, fmt.Errorf("--config requires a file")
+	}
+
+	data, err := os.ReadFile(args[1])
+	if err != nil {
+		return nil, nil, fmt.Errorf("error reading config: %v", err)
+	}
+	extra, err := k8s.LoadConfig(data)
+	if err != nil {
+		return nil, nil, err
+	}
+	return args[2:], config.Merge(extra), nil
 }
 
 // logErrors writes one "error:" line per failure and returns how many it wrote.

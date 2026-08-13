@@ -66,14 +66,33 @@ $ go run main.go approvals/kir_test.TestKind.Job.input.yaml | xargs docker scout
 
 ## How `kir` treats each document
 
-A manifest stream usually mixes workloads with other objects. `kir` handles each by kind:
+A manifest stream usually mixes workloads with other objects. `kir` handles each by what it contains, not by its kind:
 
 | Document | Result |
 | --- | --- |
-| A workload — `Pod`, `Deployment`, `DaemonSet`, `ReplicaSet`, `StatefulSet`, `Job`, `CronJob` | its images are printed to stdout |
-| A valid object with no images — `Service`, `ConfigMap`, `Secret`, … | skipped silently (exit 0) |
+| Anything containing a `PodSpec` — `Pod`, `Deployment`, …, `CronJob`, and custom resources like an Argo `Rollout` | its images are printed to stdout |
+| A valid object with no `PodSpec` — `Service`, `ConfigMap`, `Secret`, … | skipped silently (exit 0) |
 | Malformed or unreadable input | reported on stderr, non-zero exit |
 | A workload whose image value isn't a valid image reference | that image is reported on stderr with a non-zero exit; the document's other images are still printed |
-| An unrecognized custom resource (CRD) | skipped for now — see [#75](https://github.com/MPV/kir/issues/75) |
+| A resource whose images aren't in a `PodSpec` — an Argo `Workflow` | describe it with `--config` |
 
 So stdout carries only images and stderr stays quiet for normal input. See [ADR 0007](docs/adr/0007-document-classification.md) for the rationale.
+
+There is no list of supported kinds. A document yields images if it holds something shaped like a `PodSpec` — matched by decoding it against the Kubernetes API types — so a custom resource that embeds one works without `kir` knowing anything about it.
+
+### Teaching `kir` about a resource it can't infer
+
+Some resources keep images somewhere that isn't a `PodSpec`, so there is no shape to recognise. An Argo `Workflow` is the common case: a list of templates, each holding a container, a script, or neither. Describe those with `--config`, using [JMESPath](https://jmespath.org):
+
+```yaml
+# workflows.yaml
+resources:
+  - kind: Workflow
+    containers: ["spec.templates[*].[container, script][]"]
+```
+
+```shell
+$ kir --config workflows.yaml manifests/
+```
+
+An entry wins for its kind, so this also *corrects* `kir` where inference gets something wrong — an entry with no expressions silences a kind entirely. Everything not described this way is still inferred, so most manifests need no configuration at all. The built-in entries in [`k8s/resources.yaml`](k8s/resources.yaml) are only a shortcut for the common kinds: delete them and `kir` finds the same images, just more slowly.
