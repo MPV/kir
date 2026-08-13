@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.4.5](https://github.com/MPV/kir/compare/v0.4.4...v0.4.5) (2026-08-13)
+
+
+### Bug Fixes
+
+* reject image references that cannot be reported safely ([a1b7ca9](https://github.com/MPV/kir/commit/a1b7ca907925bb2ca77fa214df90b4957080e335))
+
 ## [0.4.4](https://github.com/MPV/kir/compare/v0.4.3...v0.4.4) (2026-08-10)
 
 
