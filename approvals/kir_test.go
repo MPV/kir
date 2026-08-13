@@ -42,7 +42,9 @@ func newlineTerminated(s string) string {
 }
 
 func TestKind(t *testing.T) {
-	kinds := []string{"Pod", "CronJob", "DaemonSet", "Deployment", "Job", "ReplicaSet", "StatefulSet"}
+	// PodTemplate and ReplicationController are built-in kinds carrying a
+	// PodSpec that the previous fixed kind list omitted.
+	kinds := []string{"Pod", "CronJob", "DaemonSet", "Deployment", "Job", "PodTemplate", "ReplicaSet", "ReplicationController", "StatefulSet"}
 
 	for _, kind := range kinds {
 		t.Run(kind, func(t *testing.T) {
@@ -51,11 +53,23 @@ func TestKind(t *testing.T) {
 	}
 }
 
-// A non-workload kind (Service) is skipped: no images, no error, exit 0.
+// A non-workload document is skipped: no images, no error, exit 0. Service is
+// a built-in without a PodSpec; Lookalike is a custom resource with a field
+// named containers holding something that is not a container, which pins the
+// cost of matching on shape — a name alone must not be enough to match.
 func TestSkipsNonWorkloads(t *testing.T) {
-	t.Run("Service", func(t *testing.T) {
-		verify(t, []string{"kir_test.TestSkipsNonWorkloads.Service.input.yaml"}, nil)
-	})
+	for _, name := range []string{"Service", "Lookalike"} {
+		t.Run(name, func(t *testing.T) {
+			verify(t, []string{"kir_test.TestSkipsNonWorkloads." + name + ".input.yaml"}, nil)
+		})
+	}
+}
+
+// The reach structural discovery buys: a custom resource the Kubernetes scheme
+// cannot decode, whose embedded PodSpec is found anyway. Nothing in kir names
+// the Rollout kind.
+func TestCustomResource(t *testing.T) {
+	verify(t, []string{"kir_test.TestCustomResource.input.yaml"}, nil)
 }
 
 func TestMultiple(t *testing.T) {
@@ -131,5 +145,21 @@ func TestCLI(t *testing.T) {
 
 	t.Run("Version", func(t *testing.T) {
 		verify(t, []string{"--version"}, nil)
+	})
+}
+
+// The schema is data, so what counts as a PodSpec can be replaced without
+// rebuilding kir. The fixture's containers carry a field the Kubernetes API
+// does not define: the embedded schema rejects them, and a schema passed with
+// --schema accepts them.
+func TestCustomSchema(t *testing.T) {
+	input := "kir_test.TestCustomSchema.input.yaml"
+
+	t.Run("Default", func(t *testing.T) {
+		verify(t, []string{input}, nil)
+	})
+
+	t.Run("Extended", func(t *testing.T) {
+		verify(t, []string{"--schema", "kir_test.TestCustomSchema.schema.cue", input}, nil)
 	})
 }

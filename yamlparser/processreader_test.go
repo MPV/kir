@@ -3,6 +3,8 @@ package yamlparser
 import (
 	"strings"
 	"testing"
+
+	"github.com/mpv/kir/k8s"
 )
 
 // ProcessReader must collect images from every document in a stream and split
@@ -51,7 +53,7 @@ func TestProcessReader(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := ProcessReader(strings.NewReader(tt.data))
+			got, err := ProcessReader(k8s.DefaultMatcher(), strings.NewReader(tt.data))
 			if err != nil {
 				t.Fatalf("ProcessReader() error = %v", err)
 			}

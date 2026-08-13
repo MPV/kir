@@ -1,1 +1,1 @@
-Usage: kir <file_path> [<file_path_2> ...] | kir - | kir --version
+Usage: kir [--schema <file.cue>] <file_path> [<file_path_2> ...] | kir - | kir --version

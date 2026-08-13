@@ -1,1 +1,1 @@
-error: yaml: line 9: did not find expected ',' or ']'
+error: error converting YAML to JSON: yaml: line 9: did not find expected ',' or ']'

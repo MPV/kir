@@ -66,14 +66,37 @@ $ go run main.go approvals/kir_test.TestKind.Job.input.yaml | xargs docker scout
 
 ## How `kir` treats each document
 
-A manifest stream usually mixes workloads with other objects. `kir` handles each by kind:
+A manifest stream usually mixes workloads with other objects. `kir` handles each by what it contains, not by its kind:
 
 | Document | Result |
 | --- | --- |
-| A workload — `Pod`, `Deployment`, `DaemonSet`, `ReplicaSet`, `StatefulSet`, `Job`, `CronJob` | its images are printed to stdout |
-| A valid object with no images — `Service`, `ConfigMap`, `Secret`, … | skipped silently (exit 0) |
+| Anything containing a `PodSpec` — `Pod`, `Deployment`, …, `CronJob`, and custom resources like an Argo `Rollout` | its images are printed to stdout |
+| A valid object with no `PodSpec` — `Service`, `ConfigMap`, `Secret`, … | skipped silently (exit 0) |
 | Malformed or unreadable input | reported on stderr, non-zero exit |
 | A workload whose image value isn't a valid image reference | that image is reported on stderr with a non-zero exit; the document's other images are still printed |
-| An unrecognized custom resource (CRD) | skipped for now — see [#75](https://github.com/MPV/kir/issues/75) |
+
+There is no list of supported kinds. A document yields images if it holds something the schema recognises as a `PodSpec`, so a custom resource that embeds one works without `kir` knowing anything about it.
 
 So stdout carries only images and stderr stays quiet for normal input. See [ADR 0007](docs/adr/0007-document-classification.md) for the rationale.
+
+### Teaching `kir` a different shape
+
+What counts as a `PodSpec` is a [CUE](https://cuelang.org) schema, not Go code — generated from the Kubernetes API types by `make schema`. Point `--schema` at your own to recognise containers the Kubernetes API does not describe. Your schema is loaded alongside the generated definitions, so it can extend the official type instead of restating it:
+
+```cue
+package podspec
+
+import corev1 "k8s.io/api/core/v1"
+
+#Container: {
+	corev1.#Container
+	sidecarPolicy?: string
+}
+
+#Containers: [...#Container]
+#EphemeralContainers: [...corev1.#EphemeralContainer]
+```
+
+```shell
+$ kir --schema my-containers.cue manifests/
+```

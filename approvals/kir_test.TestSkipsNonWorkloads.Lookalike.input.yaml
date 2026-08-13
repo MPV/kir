@@ -1,0 +1,9 @@
+apiVersion: logistics.example.com/v1
+kind: ShippingManifest
+metadata:
+  name: not-a-pod
+spec:
+  containers:
+  - name: cargo-hold-1
+    capacity: 40ft
+    image: photo-of-container.jpg
