@@ -66,9 +66,12 @@ The costs:
   (4.1 MB, 42) and barely above inference alone (12.4 MB, 72); still less than
   half of today's 27.2 MB.
 - Precision is uneven by design. The walk validates shape against the Kubernetes
-  types and rejects lookalikes; a configured expression is taken at its word. An
-  entry selecting something that is not a container reports nonsense, and
-  nothing checks it.
+  types and rejects lookalikes; a configured expression is taken at its word,
+  and nothing checks that what it selects is a container. ADR 0008's reference
+  validation blunts this — since 0.4.4 a selected value that is not a reportable
+  image reference is named on stderr with a non-zero exit rather than printed —
+  so a mis-aimed expression fails loudly instead of silently. What survives is
+  an expression selecting something that merely *looks* like a reference.
 
 This also makes the "seen but not detected" warning planned in #75 both rare and
 actionable for the first time: a document that is neither configured nor yields
