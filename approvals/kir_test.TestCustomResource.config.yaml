@@ -1,0 +1,5 @@
+# Teaches kir where an Argo Rollout keeps its PodSpec. Merged over the built-in
+# configuration by --config, so no rebuild is needed.
+resources:
+  - kind: Rollout
+    podSpecs: [spec.template.spec]

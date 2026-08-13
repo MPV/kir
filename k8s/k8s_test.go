@@ -1,274 +1,293 @@
 package k8s
 
 import (
+	"slices"
+	"strings"
 	"testing"
 
-	appsv1 "k8s.io/api/apps/v1"
-	batchv1 "k8s.io/api/batch/v1"
-	corev1 "k8s.io/api/core/v1"
+	"sigs.k8s.io/yaml"
 )
 
-// Test that GetPodSpec works for the kinds that have a PodSpec:
-func TestGetPodSpec(t *testing.T) {
+// decode turns a manifest into the plain Go values FindImages reads.
+func decode(t *testing.T, manifest string) map[string]any {
+	t.Helper()
+	var doc map[string]any
+	if err := yaml.Unmarshal([]byte(manifest), &doc); err != nil {
+		t.Fatalf("decoding fixture: %v", err)
+	}
+	return doc
+}
+
+func TestDefaultConfigParses(t *testing.T) {
+	config := DefaultConfig()
+	if len(config.Kinds()) == 0 {
+		t.Fatal("embedded config describes no kinds")
+	}
+}
+
+// Each configured kind is reached by following its declared path.
+func TestFindImagesConfiguredKinds(t *testing.T) {
 	tests := []struct {
-		name    string
-		obj     any
-		wantErr bool
+		name     string
+		manifest string
+		want     []string
 	}{
-		{"Pod", &corev1.Pod{}, false},
-		{"Deployment", &appsv1.Deployment{}, false},
-		{"DaemonSet", &appsv1.DaemonSet{}, false},
-		{"ReplicaSet", &appsv1.ReplicaSet{}, false},
-		{"StatefulSet", &appsv1.StatefulSet{}, false},
-		{"Job", &batchv1.Job{}, false},
-		{"CronJob", &batchv1.CronJob{}, false},
-		{"Invalid", "invalid", true},
+		{
+			name: "Pod (PodSpec directly on spec)",
+			manifest: `
+kind: Pod
+spec:
+  containers:
+  - name: app
+    image: app:1
+`,
+			want: []string{"app:1"},
+		},
+		{
+			name: "Deployment (PodSpec under a template)",
+			manifest: `
+kind: Deployment
+spec:
+  template:
+    spec:
+      containers:
+      - name: app
+        image: app:2
+`,
+			want: []string{"app:2"},
+		},
+		{
+			name: "CronJob (PodSpec four levels down)",
+			manifest: `
+kind: CronJob
+spec:
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          containers:
+          - name: app
+            image: app:3
+`,
+			want: []string{"app:3"},
+		},
+		{
+			name: "List (documents path expands items)",
+			manifest: `
+kind: List
+items:
+- kind: Pod
+  spec:
+    containers:
+    - name: a
+      image: a:1
+- kind: Service
+  spec:
+    ports:
+    - port: 80
+- kind: Pod
+  spec:
+    containers:
+    - name: b
+      image: b:1
+`,
+			want: []string{"a:1", "b:1"},
+		},
+		{
+			name: "all three container fields, in report order",
+			manifest: `
+kind: Pod
+spec:
+  containers:
+  - name: app
+    image: app:1
+  initContainers:
+  - name: init
+    image: init:1
+  ephemeralContainers:
+  - name: debugger
+    image: debug:1
+    targetContainerName: app
+`,
+			want: []string{"app:1", "init:1", "debug:1"},
+		},
+		{
+			name: "a configured kind whose path does not apply",
+			manifest: `
+kind: Pod
+status:
+  containerStatuses:
+  - name: app
+    image: app:1
+`,
+			want: nil,
+		},
+		{
+			name: "an unconfigured kind",
+			manifest: `
+kind: Service
+spec:
+  ports:
+  - port: 80
+`,
+			want: nil,
+		},
 	}
 
+	config := DefaultConfig()
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			_, err := GetPodSpec(tt.obj)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("GetPodSpec() error = %v, wantErr %v", err, tt.wantErr)
+			got := config.FindImages(decode(t, tt.manifest))
+			if !slices.Equal(got, tt.want) {
+				t.Errorf("FindImages() = %v, want %v", got, tt.want)
 			}
 		})
 	}
 }
 
-// Test that GetPodSpec returns the correct PodSpec:
-func TestGetPodSpecPod(t *testing.T) {
-	pod := &corev1.Pod{
-		Spec: corev1.PodSpec{
-			Containers: []corev1.Container{
-				{
-					Name:  "test-container",
-					Image: "test-image",
-				},
-			},
-		},
+// A custom resource is invisible until it is described, and then it is read
+// exactly like a built-in. This is the whole trade of this approach.
+func TestFindImagesCustomResourceNeedsConfig(t *testing.T) {
+	rollout := decode(t, `
+apiVersion: argoproj.io/v1alpha1
+kind: Rollout
+spec:
+  template:
+    spec:
+      containers:
+      - name: app
+        image: app:1.4.2
+`)
+
+	if got := DefaultConfig().FindImages(rollout); len(got) != 0 {
+		t.Errorf("undescribed Rollout = %v, want no images", got)
 	}
 
-	spec, err := GetPodSpec(pod)
+	extra, err := LoadConfig([]byte(`
+resources:
+  - kind: Rollout
+    podSpecs: [spec.template.spec]
+`))
 	if err != nil {
-		t.Fatalf("GetPodSpec() error = %v", err)
+		t.Fatalf("LoadConfig() error = %v", err)
 	}
 
-	if len(spec.Containers) != 1 {
-		t.Fatalf("expected 1 container, got %d", len(spec.Containers))
-	}
-
-	if spec.Containers[0].Image != "test-image" {
-		t.Errorf("expected image %q, got %q", "test-image", spec.Containers[0].Image)
+	want := []string{"app:1.4.2"}
+	if got := DefaultConfig().Merge(extra).FindImages(rollout); !slices.Equal(got, want) {
+		t.Errorf("described Rollout = %v, want %v", got, want)
 	}
 }
 
-// Test that GetPodSpec returns the correct PodSpec for all supported kinds:
-func TestGetPodSpecSupported(t *testing.T) {
-	commonPodSpec := corev1.PodSpec{
-		Containers: []corev1.Container{
-			{
-				Name:  "test-container",
-				Image: "test-image",
-			},
-		},
+// Merging replaces a kind's paths, so a built-in entry can be corrected and not
+// merely extended.
+func TestMergeReplacesPaths(t *testing.T) {
+	pod := decode(t, `
+kind: Pod
+elsewhere:
+  containers:
+  - name: app
+    image: app:1
+`)
+
+	extra, err := LoadConfig([]byte(`
+resources:
+  - kind: Pod
+    podSpecs: [elsewhere]
+`))
+	if err != nil {
+		t.Fatalf("LoadConfig() error = %v", err)
 	}
+
+	want := []string{"app:1"}
+	if got := DefaultConfig().Merge(extra).FindImages(pod); !slices.Equal(got, want) {
+		t.Errorf("FindImages() = %v, want %v", got, want)
+	}
+}
+
+// A path that runs off the end of the document yields nothing rather than
+// panicking, which is the normal case for an optional field.
+func TestResolveMissingPath(t *testing.T) {
+	doc := decode(t, `
+kind: Deployment
+spec: {}
+`)
+	if got := DefaultConfig().FindImages(doc); len(got) != 0 {
+		t.Errorf("FindImages() = %v, want no images", got)
+	}
+}
+
+func TestLoadConfigRejectsUnknownFields(t *testing.T) {
+	if _, err := LoadConfig([]byte("resources:\n  - kind: Pod\n    podSpec: [spec]\n")); err == nil {
+		t.Error("LoadConfig() accepted an unknown field, want an error")
+	}
+}
+
+// Expressions are compiled when the config loads, so a typo is an error at that
+// point rather than a path that silently matches nothing for the rest of the
+// run. This is the main safety gain over plain field paths.
+func TestLoadConfigRejectsBadExpression(t *testing.T) {
+	_, err := LoadConfig([]byte("resources:\n  - kind: Pod\n    podSpecs: [\"spec[\"]\n"))
+	if err == nil {
+		t.Fatal("LoadConfig() accepted a malformed expression, want an error")
+	}
+	if !strings.Contains(err.Error(), "Pod.podSpecs") {
+		t.Errorf("error = %q, want it to name the offending kind and field", err)
+	}
+}
+
+// A resource can hold bare containers rather than a PodSpec. An Argo Workflow
+// is the common case: a list of templates, each with a container, a script, or
+// neither.
+func TestFindImagesContainersExpression(t *testing.T) {
+	workflow := decode(t, `
+kind: Workflow
+spec:
+  templates:
+  - name: build
+    container:
+      image: builder:1
+  - name: report
+    script:
+      image: python:3.12
+  - name: fanout
+    dag:
+      tasks:
+      - name: a
+`)
 
 	tests := []struct {
 		name string
-		obj  any
+		expr string
+		want []string
 	}{
-		{"Deployment", &appsv1.Deployment{
-			Spec: appsv1.DeploymentSpec{
-				Template: corev1.PodTemplateSpec{
-					Spec: commonPodSpec,
-				},
-			},
-		}},
-		{"DaemonSet", &appsv1.DaemonSet{
-			Spec: appsv1.DaemonSetSpec{
-				Template: corev1.PodTemplateSpec{
-					Spec: commonPodSpec,
-				},
-			},
-		}},
-		{"ReplicaSet", &appsv1.ReplicaSet{
-			Spec: appsv1.ReplicaSetSpec{
-				Template: corev1.PodTemplateSpec{
-					Spec: commonPodSpec,
-				},
-			},
-		}},
-		{"StatefulSet", &appsv1.StatefulSet{
-			Spec: appsv1.StatefulSetSpec{
-				Template: corev1.PodTemplateSpec{
-					Spec: commonPodSpec,
-				},
-			},
-		}},
-		{"Job", &batchv1.Job{
-			Spec: batchv1.JobSpec{
-				Template: corev1.PodTemplateSpec{
-					Spec: commonPodSpec,
-				},
-			},
-		}},
-		{"CronJob", &batchv1.CronJob{
-			Spec: batchv1.CronJobSpec{
-				JobTemplate: batchv1.JobTemplateSpec{
-					Spec: batchv1.JobSpec{
-						Template: corev1.PodTemplateSpec{
-							Spec: commonPodSpec,
-						},
-					},
-				},
-			},
-		}},
+		{
+			// A projection drops the templates with no container rather than
+			// yielding nulls for them.
+			name: "projection skips templates without the field",
+			expr: "spec.templates[*].container",
+			want: []string{"builder:1"},
+		},
+		{
+			// Both shapes in one expression — a multi-select, flattened.
+			name: "multi-select collects both shapes",
+			expr: "spec.templates[*].[container, script][]",
+			want: []string{"builder:1", "python:3.12"},
+		},
+		{
+			name: "filter selects a subset",
+			expr: "spec.templates[?name != 'report'].[container, script][]",
+			want: []string{"builder:1"},
+		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			spec, err := GetPodSpec(tt.obj)
+			config, err := LoadConfig([]byte("resources:\n  - kind: Workflow\n    containers: [\"" + tt.expr + "\"]\n"))
 			if err != nil {
-				t.Fatalf("GetPodSpec() error = %v", err)
+				t.Fatalf("LoadConfig() error = %v", err)
 			}
-
-			if len(spec.Containers) != 1 {
-				t.Fatalf("expected 1 container, got %d", len(spec.Containers))
-			}
-
-			if spec.Containers[0].Image != "test-image" {
-				t.Errorf("expected image %q, got %q", "test-image", spec.Containers[0].Image)
-			}
-		})
-	}
-}
-
-// Test that GetPodSpec fails for an object that does not have a PodSpec:
-func TestGetPodSpecInvalid(t *testing.T) {
-	_, err := GetPodSpec("invalid")
-
-	// Assert correct error message ()"object does not have a PodSpec"):
-	if err == nil || err.Error() != "object does not have a PodSpec" {
-		t.Fatalf("GetPodSpec() error = %v, want %q", err, "object does not have a PodSpec")
-	}
-}
-
-func TestGetContainerImages(t *testing.T) {
-	containers := []corev1.Container{
-		{Name: "container1", Image: "image1"},
-		{Name: "container2", Image: "image2"},
-	}
-
-	expected := []string{"image1", "image2"}
-	images := GetContainerImages(containers)
-
-	if len(images) != len(expected) {
-		t.Fatalf("expected %d images, got %d", len(expected), len(images))
-	}
-
-	for i, img := range images {
-		if img != expected[i] {
-			t.Errorf("expected image %q, got %q", expected[i], img)
-		}
-	}
-}
-
-func TestGetContainersFromObject(t *testing.T) {
-	tests := []struct {
-		name    string
-		obj     any
-		want    []corev1.Container
-		wantErr bool
-	}{
-		{
-			name: "Pod",
-			obj: &corev1.Pod{
-				Spec: corev1.PodSpec{
-					Containers: []corev1.Container{
-						{Name: "container1", Image: "image1"},
-					},
-					InitContainers: []corev1.Container{
-						{Name: "init-container1", Image: "init-image1"},
-					},
-				},
-			},
-			want: []corev1.Container{
-				{Name: "container1", Image: "image1"},
-				{Name: "init-container1", Image: "init-image1"},
-			},
-			wantErr: false,
-		},
-		{
-			name: "Deployment",
-			obj: &appsv1.Deployment{
-				Spec: appsv1.DeploymentSpec{
-					Template: corev1.PodTemplateSpec{
-						Spec: corev1.PodSpec{
-							Containers: []corev1.Container{
-								{Name: "container1", Image: "image1"},
-							},
-							InitContainers: []corev1.Container{
-								{Name: "init-container1", Image: "init-image1"},
-							},
-						},
-					},
-				},
-			},
-			want: []corev1.Container{
-				{Name: "container1", Image: "image1"},
-				{Name: "init-container1", Image: "init-image1"},
-			},
-			wantErr: false,
-		},
-		{
-			name: "Pod with ephemeral container",
-			obj: &corev1.Pod{
-				Spec: corev1.PodSpec{
-					Containers: []corev1.Container{
-						{Name: "container1", Image: "image1"},
-					},
-					InitContainers: []corev1.Container{
-						{Name: "init-container1", Image: "init-image1"},
-					},
-					EphemeralContainers: []corev1.EphemeralContainer{
-						{
-							EphemeralContainerCommon: corev1.EphemeralContainerCommon{
-								Name:  "debugger",
-								Image: "ephemeral-image1",
-							},
-						},
-					},
-				},
-			},
-			want: []corev1.Container{
-				{Name: "container1", Image: "image1"},
-				{Name: "init-container1", Image: "init-image1"},
-				{Name: "debugger", Image: "ephemeral-image1"},
-			},
-			wantErr: false,
-		},
-		{
-			name:    "Invalid",
-			obj:     "invalid",
-			want:    nil,
-			wantErr: true,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got, err := GetContainersFromObject(tt.obj)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("GetContainersFromObject() error = %v, wantErr %v", err, tt.wantErr)
-				return
-			}
-			if len(got) != len(tt.want) {
-				t.Errorf("expected %d containers, got %d", len(tt.want), len(got))
-			}
-			for i, container := range got {
-				if container.Name != tt.want[i].Name || container.Image != tt.want[i].Image {
-					t.Errorf("expected container %v, got %v", tt.want[i], container)
-				}
+			if got := config.FindImages(workflow); !slices.Equal(got, tt.want) {
+				t.Errorf("FindImages() = %v, want %v", got, tt.want)
 			}
 		})
 	}

@@ -18,3 +18,4 @@ date the decision was actually made.
 | [0006](0006-conventional-commits-and-releases.md) | Automate releases from Conventional Commits | 2026-08-06 |
 | [0007](0007-document-classification.md) | How kir classifies each document (workload / image-less / unprocessable) | 2026-08-08 |
 | [0008](0008-best-effort-processing-and-exit-codes.md) | Best-effort processing; failures surface via the exit code | 2026-08-09 |
+| [0009](0009-podspec-discovery.md) | Find images at configured per-kind JMESPath expressions (proposed — #26) | 2026-08-09 |

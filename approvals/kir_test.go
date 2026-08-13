@@ -42,7 +42,10 @@ func newlineTerminated(s string) string {
 }
 
 func TestKind(t *testing.T) {
-	kinds := []string{"Pod", "CronJob", "DaemonSet", "Deployment", "Job", "ReplicaSet", "StatefulSet"}
+	// PodTemplate and ReplicationController are built-in kinds carrying a
+	// PodSpec that the previous fixed kind list omitted; they are entries in
+	// the built-in configuration now.
+	kinds := []string{"Pod", "CronJob", "DaemonSet", "Deployment", "Job", "PodTemplate", "ReplicaSet", "ReplicationController", "StatefulSet"}
 
 	for _, kind := range kinds {
 		t.Run(kind, func(t *testing.T) {
@@ -51,10 +54,41 @@ func TestKind(t *testing.T) {
 	}
 }
 
-// A non-workload kind (Service) is skipped: no images, no error, exit 0.
+// A document kir has no configuration for is skipped: no images, no error,
+// exit 0. Service is a built-in without a PodSpec; Lookalike is an undescribed
+// custom resource, which is skipped for the same reason — being undescribed —
+// whether or not it happens to have a field named containers.
 func TestSkipsNonWorkloads(t *testing.T) {
-	t.Run("Service", func(t *testing.T) {
-		verify(t, []string{"kir_test.TestSkipsNonWorkloads.Service.input.yaml"}, nil)
+	for _, name := range []string{"Service", "Lookalike"} {
+		t.Run(name, func(t *testing.T) {
+			verify(t, []string{"kir_test.TestSkipsNonWorkloads." + name + ".input.yaml"}, nil)
+		})
+	}
+}
+
+// A custom resource is invisible until described, and read like a built-in once
+// it is. Both halves are pinned, because the first is the cost of this approach
+// and the second is the benefit.
+func TestCustomResource(t *testing.T) {
+	input := "kir_test.TestCustomResource.input.yaml"
+
+	t.Run("Undescribed", func(t *testing.T) {
+		verify(t, []string{input}, nil)
+	})
+
+	t.Run("Configured", func(t *testing.T) {
+		verify(t, []string{"--config", "kir_test.TestCustomResource.config.yaml", input}, nil)
+	})
+
+	// An Argo Workflow holds bare containers in a list of templates, each of
+	// which has a container, a script, or neither. One JMESPath expression
+	// covers it — select both shapes across the list, flatten, and templates
+	// with neither drop out — which a plain field path could not express.
+	t.Run("Workflow", func(t *testing.T) {
+		verify(t, []string{
+			"--config", "kir_test.TestCustomResource.Workflow.config.yaml",
+			"kir_test.TestCustomResource.Workflow.input.yaml",
+		}, nil)
 	})
 }
 

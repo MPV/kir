@@ -5,21 +5,14 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"slices"
 
 	"github.com/mpv/kir/k8s"
-	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/runtime/serializer"
 	utilyaml "k8s.io/apimachinery/pkg/util/yaml"
-	"k8s.io/client-go/kubernetes/scheme"
+	"sigs.k8s.io/yaml"
 )
 
-var supportedKinds = []string{"Pod", "Deployment", "DaemonSet", "ReplicaSet", "StatefulSet", "Job", "CronJob"}
-
 // ProcessReader reads a (possibly multi-document) YAML stream and returns the
-// container images of every supported workload it contains. Documents are
+// container images of every workload it contains, using config to decide where each kind keeps its images. Documents are
 // separated using the Kubernetes YAML reader, which correctly handles leading
 // and trailing "---" separators, separators followed by trailing whitespace,
 // CRLF line endings, and a final document without a trailing newline.
@@ -30,7 +23,7 @@ var supportedKinds = []string{"Pod", "Deployment", "DaemonSet", "ReplicaSet", "S
 // image it finds and surface failures through the exit code; that has to hold
 // within a stream as well as between inputs, or one unparseable document in a
 // cluster dump costs every image around it.
-func ProcessReader(r io.Reader) ([]string, error) {
+func ProcessReader(config *k8s.Config, r io.Reader) ([]string, error) {
 	var images []string
 	var errs []error
 	reader := utilyaml.NewYAMLReader(bufio.NewReader(r))
@@ -45,7 +38,7 @@ func ProcessReader(r io.Reader) ([]string, error) {
 			errs = append(errs, fmt.Errorf("error reading YAML document: %v", err))
 			break
 		}
-		imgs, err := ProcessData(doc)
+		imgs, err := ProcessData(config, doc)
 		if err != nil {
 			errs = append(errs, err)
 			continue
@@ -55,72 +48,30 @@ func ProcessReader(r io.Reader) ([]string, error) {
 	return images, errors.Join(errs...)
 }
 
-func ProcessData(data []byte) ([]string, error) {
-	// Decode the YAML file into a Kubernetes object
-	decode := serializer.NewCodecFactory(scheme.Scheme).UniversalDeserializer().Decode
-	obj, gvk, err := decode(data, nil, nil)
-	if err != nil {
-		// Kinds that aren't registered in the scheme (CRDs and other custom
-		// resources) are skipped rather than failing the whole stream. Some of
-		// them may embed a PodSpec we could inspect; surfacing those ("seen but
-		// not detected") is tracked in #75. For now they are skipped silently,
-		// like any other non-workload document — see
-		// docs/adr/0007-document-classification.md.
-		if runtime.IsNotRegisteredError(err) {
-			return nil, nil
-		}
+// ProcessData returns the images in a single manifest document.
+//
+// The document is decoded into plain Go values rather than into a typed
+// Kubernetes object, so a custom resource is reachable on the same terms as a
+// built-in: whether it yields images depends only on whether the configuration
+// describes it.
+func ProcessData(config *k8s.Config, data []byte) ([]string, error) {
+	var doc map[string]any
+	if err := yaml.Unmarshal(data, &doc); err != nil {
 		return nil, err
 	}
 
-	var images []string
-
-	// Check if the object has containers
-	if containers, err := k8s.GetContainersFromObject(obj); err == nil {
-		images = append(images, k8s.GetContainerImages(containers)...)
-		return images, nil
+	// Everything kir accepts is a Kubernetes object, and every Kubernetes
+	// object has a kind. Requiring it keeps kir pointed at manifests instead of
+	// mining arbitrary YAML (a Helm values.yaml, say) for anything image-like,
+	// and it keeps an empty or malformed document an error rather than a silent
+	// no-op — the unprocessable tier of
+	// docs/adr/0007-document-classification.md, which ADR 0008 surfaces as a
+	// non-zero exit.
+	if _, ok := doc["kind"]; !ok {
+		return nil, fmt.Errorf("Object 'Kind' is missing in %q", data)
 	}
 
-	// Handle List type separately
-	if gvk.Kind == "List" {
-		list, ok := obj.(*corev1.List)
-		if !ok {
-			return nil, fmt.Errorf("not a List")
-		}
-		for _, item := range list.Items {
-			var unstructuredObj unstructured.Unstructured
-			if err := unstructuredObj.UnmarshalJSON(item.Raw); err != nil {
-				return nil, fmt.Errorf("error unmarshaling item: %v", err)
-			}
-			imgs, err := processUnstructured(unstructuredObj)
-			if err != nil {
-				return nil, fmt.Errorf("error processing unstructured item: %v", err)
-			}
-			images = append(images, imgs...)
-		}
-		return images, nil
-	}
-
-	// Any other kind (Service, ConfigMap, ...) is a valid object with no images
-	// to report, not an error; skip it silently so a single non-workload
-	// document does not discard images from the rest of the stream. See
-	// docs/adr/0007-document-classification.md.
-	return nil, nil
-}
-
-func processUnstructured(item unstructured.Unstructured) ([]string, error) {
-	itemData, err := item.MarshalJSON()
-	if err != nil {
-		return nil, fmt.Errorf("error marshaling item: %v", err)
-	}
-	gvk := item.GroupVersionKind()
-	if slices.Contains(supportedKinds, gvk.Kind) {
-		images, err := ProcessData(itemData)
-		if err != nil {
-			return nil, fmt.Errorf("error processing data: %v", err)
-		}
-		return images, nil
-	}
-	// Non-workload items inside a List are skipped, mirroring how top-level
-	// non-workload documents are handled.
-	return nil, nil
+	// A document with nothing to report — a Service, a ConfigMap — is not an
+	// error. See ADR 0007.
+	return config.FindImages(doc), nil
 }

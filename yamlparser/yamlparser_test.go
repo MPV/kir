@@ -5,6 +5,8 @@ import (
 	"slices"
 	"strings"
 	"testing"
+
+	"github.com/mpv/kir/k8s"
 )
 
 func TestProcessData(t *testing.T) {
@@ -19,7 +21,7 @@ spec:
     image: test-image
 `
 
-	images, err := ProcessData([]byte(data))
+	images, err := ProcessData(k8s.DefaultConfig(), []byte(data))
 	if err != nil {
 		t.Fatalf("ProcessData() error = %v", err)
 	}
@@ -55,7 +57,7 @@ spec:
     targetContainerName: test-container
 `
 
-	images, err := ProcessData([]byte(data))
+	images, err := ProcessData(k8s.DefaultConfig(), []byte(data))
 	if err != nil {
 		t.Fatalf("ProcessData() error = %v", err)
 	}
@@ -83,7 +85,7 @@ func TestProcessReaderKeepsImagesAroundABadDocument(t *testing.T) {
 		"apiVersion: v1\nkind: Pod\nspec:\n  containers:\n  - {name: c, image: after-the-break}\n",
 	}, "---\n")
 
-	images, err := ProcessReader(strings.NewReader(stream))
+	images, err := ProcessReader(k8s.DefaultConfig(), strings.NewReader(stream))
 
 	if err == nil {
 		t.Error("ProcessReader() error = nil, want the bad document reported")
@@ -100,7 +102,7 @@ func TestProcessReaderReportsEveryBadDocument(t *testing.T) {
 	bad := "apiVersion: v1\nkind: Pod\nspec:\n  containers:\n  - {name: c, image: nginx, ports: [8080}\n"
 	stream := strings.Join([]string{bad, bad}, "---\n")
 
-	images, err := ProcessReader(strings.NewReader(stream))
+	images, err := ProcessReader(k8s.DefaultConfig(), strings.NewReader(stream))
 
 	if len(images) != 0 {
 		t.Errorf("ProcessReader() images = %v, want none", images)
