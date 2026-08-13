@@ -66,8 +66,13 @@ a specified language users may already know from Kyverno or the AWS CLI, rather
 than a syntax peculiar to kir.
 
 The price is a dependency (13 `go.sum` lines, 0.2 MB of binary, and 1 ms per
-1000 documents — 75 ms to 76 ms) and a larger surface: users can now write expressions that select
-something which is not a container at all, and nothing here checks that claim.
+1000 documents — 75 ms to 76 ms) and a larger surface: users can now write
+expressions that select something which is not a container at all, and nothing
+here checks that claim. ADR 0008's reference validation blunts it — since 0.4.4
+a selected value that is not a reportable image reference is named on stderr
+with a non-zero exit rather than printed — so a mis-aimed expression fails
+loudly. What survives is one selecting something that merely *looks* like a
+reference.
 
 Precision is exact by construction. A path either matches or it does not, so
 there are no false positives to guard against and no schema to keep in step with
