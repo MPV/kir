@@ -12,6 +12,27 @@ gofmt -l .   # should print nothing
 CI runs `gofmt`, `go vet`, `go mod tidy` verification, and `go test -race`, so
 run them locally before opening a pull request.
 
+## Approving changed golden output
+
+Behaviour is pinned by approval tests (ADR 0004/0005), so a change to what `kir`
+prints shows up as failing goldens. A failing test leaves what it produced beside
+its golden as `*.received.txt` and `make test` prints both files' contents; a
+passing test deletes its own received file. When the new output is what you
+meant:
+
+```shell
+make test      # prints received vs approved for each failure
+make approve   # renames every *.received.txt over its *.approved.txt
+```
+
+`make approve` accepts every received file it finds, so run it after a full
+`make test` — a filtered `go test -run ...` leaves the untouched tests' files
+behind.
+
+Read the output before approving. A golden diff *is* the behaviour change, so it
+belongs in the pull request description; approving one to clear a red test hides
+the very thing review needs to see.
+
 ## Architecture decisions
 
 Design decisions are recorded as ADRs in [`docs/adr/`](docs/adr/). Read them

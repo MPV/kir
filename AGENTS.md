@@ -25,6 +25,10 @@ file is the short version of what trips agents up.
   checked-in `.yaml`, which tooling silently normalises.
 - Run before opening a PR: `make test`, `go vet ./...`, `gofmt -l .` (empty),
   `go test -race ./...`.
+- Intended output changes: `make test` prints received vs approved for each
+  failure, `make approve` accepts them. Read the diff first and describe it in
+  the PR body — a golden diff **is** the behaviour change, so never approve one
+  just to clear a red test.
 
 ## Commits & PRs
 
