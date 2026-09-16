@@ -3,7 +3,7 @@ module github.com/mpv/kir
 go 1.26.0
 
 require (
-	github.com/approvals/go-approval-tests v1.14.0
+	github.com/approvals/go-approval-tests v1.15.0
 	github.com/distribution/reference v0.6.0
 	k8s.io/api v0.36.3
 	k8s.io/apimachinery v0.36.3
